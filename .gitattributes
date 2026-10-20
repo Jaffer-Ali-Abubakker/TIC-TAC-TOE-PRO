@@ -1,0 +1,17 @@
+# Normalise line endings: store LF in the repository, convert on checkout.
+* text=auto
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Keep the SQL migration and lockfile diff-friendly.
+*.sql text
+*.md text
+*.svg text
