@@ -59,6 +59,20 @@ describe('useOnlineRoom', () => {
     expect(result.current.mySymbol).toBe('O')
   })
 
+  it('surfaces the real reason when the guest session cannot be created', async () => {
+    supabase.failSignIn('anonymous_provider_disabled', 'Anonymous sign-ins are disabled')
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.createRoom()
+    })
+
+    // The specific reason must not be replaced by a generic message.
+    expect(result.current.error).toMatch(/anonymous sign-ins are disabled/i)
+    expect(result.current.error).toMatch(/Authentication/i)
+    expect(result.current.error).not.toMatch(/A guest session is required/)
+  })
+
   it('rejects a malformed room code without calling the server', async () => {
     const { result } = renderHook(() => useOnlineRoom())
 

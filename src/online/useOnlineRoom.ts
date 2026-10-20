@@ -266,10 +266,13 @@ export function useOnlineRoom(): OnlineRoomController {
     setBusy(true)
     clearError()
     try {
-      const user = await session.ensureSession()
-      if (!user) {
-        setError('A guest session is required to create a room.')
-        setErrorCode('unauthenticated')
+      const attempt = await session.ensureSession()
+      if (!attempt.userId) {
+        // The session layer already reported the precise reason (for example
+        // "anonymous sign-ins are disabled"). Never overwrite it with a
+        // generic message.
+        setError(attempt.error ?? 'A guest session is required to create a room.')
+        setErrorCode((attempt.errorCode as OnlineErrorCode) ?? 'unauthenticated')
         return
       }
       const state = await createOnlineRoom(activeClient, displayName)
@@ -302,10 +305,10 @@ export function useOnlineRoom(): OnlineRoomController {
       setBasePhase('connecting')
       setConnection('connecting')
       try {
-        const user = await session.ensureSession()
-        if (!user) {
-          setError('A guest session is required to join a room.')
-          setErrorCode('unauthenticated')
+        const attempt = await session.ensureSession()
+        if (!attempt.userId) {
+          setError(attempt.error ?? 'A guest session is required to join a room.')
+          setErrorCode((attempt.errorCode as OnlineErrorCode) ?? 'unauthenticated')
           setBasePhase('lobby')
           return
         }

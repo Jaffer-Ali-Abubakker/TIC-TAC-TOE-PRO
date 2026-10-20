@@ -35,6 +35,8 @@ export interface FakeSupabase {
   onRpc: (name: string, handler: (args: Record<string, unknown>) => unknown) => void
   /** Makes an RPC fail with a controlled `online:<code>` error. */
   failRpc: (name: string, code: string) => void
+  /** Makes the anonymous sign-in fail with a GoTrue style error. */
+  failSignIn: (code: string, message: string) => void
   channels: FakeChannel[]
   removedChannels: number
   signedInAnonymously: number
@@ -83,6 +85,7 @@ export function createFakeSupabase(): FakeSupabase {
   const channels: FakeChannel[] = []
   let sessionUserId: string | null = null
   let signedInAnonymously = 0
+  let signInFailure: { code: string; message: string } | null = null
 
   const fake: FakeSupabase = {
     client: undefined as unknown as SupabaseClient,
@@ -94,6 +97,9 @@ export function createFakeSupabase(): FakeSupabase {
       handlers.set(name, () => {
         throw new Error(`online:${code}`)
       })
+    },
+    failSignIn: (code, message) => {
+      signInFailure = { code, message }
     },
     channels,
     removedChannels: 0,
@@ -116,6 +122,11 @@ export function createFakeSupabase(): FakeSupabase {
       signInAnonymously: vi.fn(async () => {
         signedInAnonymously += 1
         fake.signedInAnonymously = signedInAnonymously
+        if (signInFailure) {
+          const error = new Error(signInFailure.message) as Error & { code?: string }
+          error.code = signInFailure.code
+          return { data: { user: null, session: null }, error }
+        }
         sessionUserId = 'anonymous-user'
         return { data: { user: { id: 'anonymous-user' } }, error: null }
       }),
