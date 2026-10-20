@@ -33,7 +33,7 @@ begin
       raw_app_meta_data, raw_user_meta_data
     ) values (
       '00000000-0000-0000-0000-000000000000', v_alice, 'authenticated', 'authenticated',
-      'alice@ttt-test.local', 'throwaway-test-password',
+      'alice@ttt-test.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
       now(), now(), now(), '{}'::jsonb, '{}'::jsonb
     );
   end if;
@@ -45,7 +45,7 @@ begin
       raw_app_meta_data, raw_user_meta_data
     ) values (
       '00000000-0000-0000-0000-000000000000', v_bob, 'authenticated', 'authenticated',
-      'bob@ttt-test.local', 'throwaway-test-password',
+      'bob@ttt-test.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
       now(), now(), now(), '{}'::jsonb, '{}'::jsonb
     );
   end if;

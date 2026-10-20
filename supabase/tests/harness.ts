@@ -127,7 +127,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
            raw_app_meta_data, raw_user_meta_data
          ) values (
            '00000000-0000-0000-0000-000000000000', '${userId}', 'authenticated', 'authenticated',
-           '${userId}@example.test', 'throwaway-test-password',
+           '${userId}@example.test', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
            now(), now(), now(), '{}'::jsonb, '{}'::jsonb
          )
          on conflict (id) do nothing`,

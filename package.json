@@ -13,7 +13,8 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:db": "vitest run supabase/tests",
-    "test:online": "vitest run src/online src/App.online.test.tsx"
+    "test:online": "vitest run src/online src/App.online.test.tsx",
+    "setup:env": "powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

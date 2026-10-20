@@ -114,6 +114,29 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxx
 VITE_APP_URL=https://tic-tac-toe-pro.vercel.app
 ```
 
+### Let the script fill it in for you
+
+Instead of copying the values by hand, run:
+
+```powershell
+npm run setup:env
+```
+
+It asks for a **Supabase personal access token**
+(*Account Preferences -> Personal Access Tokens*), looks up your project,
+fetches the publishable key through the Supabase Management API and writes
+`.env` for you.
+
+The token is read with a hidden prompt, kept in memory only, and is never
+written to disk, printed, or passed as a command line argument - so it never
+ends up in your shell history or in the repository.
+
+Pass the project ref and app URL explicitly if you want to skip the prompts:
+
+```powershell
+npm run setup:env -- -ProjectRef abcdefghijklmnop -AppUrl https://my-app.vercel.app
+```
+
 > **Every `VITE_` variable is public.** It is bundled into the JavaScript that
 > every visitor downloads. Never put the service role key, a database
 > password or any other privileged secret in a `VITE_` variable, and never
