@@ -15,7 +15,8 @@
     "test:db": "vitest run supabase/tests",
     "test:online": "vitest run src/online src/App.online.test.tsx",
     "setup:env": "powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1",
-    "setup:anonymous": "powershell -ExecutionPolicy Bypass -File scripts/enable-anonymous-signin.ps1"
+    "setup:anonymous": "powershell -ExecutionPolicy Bypass -File scripts/enable-anonymous-signin.ps1",
+    "verify:db": "powershell -ExecutionPolicy Bypass -File scripts/verify-database.ps1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

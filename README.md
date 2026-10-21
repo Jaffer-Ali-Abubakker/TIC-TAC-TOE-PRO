@@ -197,6 +197,24 @@ psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migratio
 
 The migration is idempotent: re-running it is safe.
 
+### Verifying the hosted database
+
+After any change to the migration, re-apply it and check the result:
+
+```powershell
+# apply (session-mode pooler, from .env.local)
+supabase db push --db-url "<session mode pooler url>"
+
+# verify every object, policy, grant and privilege
+npm run verify:db
+```
+
+`verify:db` runs `supabase/tests/verify_hosted.sql` against the project and
+compares every value with what the migration produces - the table count, the
+function count, the RLS policies, the realtime publication, the function
+grants, the `search_path` pinning and the `online_room_payload` lock. It exits
+non-zero on any mismatch, so it can be used in CI.
+
 ### 3. Enable anonymous sign-in
 
 1. Go to *Authentication -> Providers -> Email*.
@@ -217,6 +235,24 @@ the Management API and then verifies the result through the public
 `/auth/v1/settings` endpoint. The token is read with a hidden prompt and is
 never written to disk, printed or passed as a command line argument. The
 project ref and publishable key are read from your `.env` automatically.
+
+### Verifying the hosted database
+
+After any change to the migration, re-apply it and check the result:
+
+```powershell
+# apply (session-mode pooler, from .env.local)
+supabase db push --db-url "<session mode pooler url>"
+
+# verify every object, policy, grant and privilege
+npm run verify:db
+```
+
+`verify:db` runs `supabase/tests/verify_hosted.sql` against the project and
+compares every value with what the migration produces - the table count, the
+function count, the RLS policies, the realtime publication, the function
+grants, the `search_path` pinning and the `online_room_payload` lock. It exits
+non-zero on any mismatch, so it can be used in CI.
 
 ### 4. Configure Realtime
 
@@ -390,6 +426,9 @@ constraint is what makes a retried move idempotent.
 | `npm run test:coverage`  | Run the test suite with a coverage report.                  |
 | `npm run test:db`        | Run only the database security tests.                       |
 | `npm run test:online`    | Run only the online multiplayer tests.                      |
+| `npm run verify:db`      | Check the hosted database against the migration.             |
+| `npm run setup:env`      | Generate `.env` from the Supabase Management API.           |
+| `npm run setup:anonymous`| Enable anonymous sign-ins on your Supabase project.         |
 
 ## Testing
 
