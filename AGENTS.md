@@ -416,6 +416,13 @@ regression.
     `now()` on every write, so age-based logic must use `expires_at` instead.
 23. **RLS policies should use `(select auth.uid())`.** Wrapping it in a sub-query lets the planner
     evaluate it once as an InitPlan instead of per row.
+24. **Every function must pin its `search_path`.** `supabase db advisors` flags any function that
+    does not, because a mutable `search_path` lets an attacker who can create an object shadow a
+    name inside it. All 19 functions now use `set search_path = public, pg_temp`. After changing the
+    migration, re-run `supabase db advisors` and expect **zero advisories**.
+25. **The direct database host may be unreachable.** `db.<ref>.supabase.co` is IPv6-only on many
+    projects; use the pooler host (`aws-0-<region>.pooler.supabase.com:6543`, user
+    `postgres.<ref>`) instead. The wrong region answers *"tenant/user ... not found"*.
 
 ---
 

@@ -20,6 +20,12 @@ const gitignore = readFileSync(join(projectRoot, '.gitignore'), 'utf8')
 /** A real key: the prefix plus at least 20 key characters. */
 const SECRET_KEY_PATTERN = /sb_secret_[A-Za-z0-9_-]{20,}/
 
+/**
+ * A Postgres connection string that carries a password, for example
+ * postgresql://postgres:hunter2@db.example.supabase.co:5432/postgres
+ */
+const CONNECTION_STRING_PATTERN = /postgres(?:ql)?:\/\/[^:\s@/]+:[^@\s/]+@/
+
 const IGNORED_DIRECTORIES = new Set([
   'node_modules',
   '.git',
@@ -69,8 +75,26 @@ describe('secret hygiene', () => {
     expect(gitignore).toMatch(/!\.env\.example/)
   })
 
-  it('never puts a secret key in a VITE_ variable', () => {
-    const envPath = join(projectRoot, '.env')
+  it('finds no database connection string with a password', () => {
+    const thisFile = fileURLToPath(import.meta.url)
+    const offenders: string[] = []
+    for (const file of files) {
+      if (file === thisFile) continue
+      if (/\.(png|jpe?g|gif|ico|woff2?|pdf|sqlite3?|db)$/i.test(file)) continue
+      let contents: string
+      try {
+        contents = readFileSync(file, 'utf8')
+      } catch {
+        continue
+      }
+      if (CONNECTION_STRING_PATTERN.test(contents)) {
+        offenders.push(relative(projectRoot, file))
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('never puts a secret key in a VITE_ variable', () => {    const envPath = join(projectRoot, '.env')
     let contents: string
     try {
       contents = readFileSync(envPath, 'utf8')
@@ -120,6 +144,7 @@ describe('secret hygiene', () => {
     for (const file of sourceFiles) {
       const contents = readFileSync(file, 'utf8')
       expect(contents).not.toMatch(/SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE/)
+      expect(contents).not.toMatch(CONNECTION_STRING_PATTERN)
     }
   })
 

@@ -114,6 +114,7 @@ create or replace function public.online_board_is_valid(p_board text[])
 returns boolean
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select p_board is not null
      and cardinality(p_board) = 9
@@ -128,6 +129,7 @@ create or replace function public.online_winning_combination(p_board text[])
 returns integer[]
 language plpgsql
 immutable
+set search_path = public, pg_temp
 as $$
 declare
   c constant integer[][] := array[
@@ -164,6 +166,7 @@ create or replace function public.online_board_is_full(p_board text[])
 returns boolean
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select p_board is not null
      and cardinality(p_board) = 9
@@ -175,6 +178,7 @@ create or replace function public.online_sanitize_name(p_name text)
 returns text
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select nullif(left(regexp_replace(coalesce(p_name, ''), '[[:cntrl:]]', '', 'g'), 24), '');
 $$;
@@ -184,6 +188,7 @@ create or replace function public.online_normalize_code(p_code text)
 returns text
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select upper(regexp_replace(coalesce(p_code, ''), '[^0-9A-Za-z]', '', 'g'));
 $$;
@@ -193,6 +198,7 @@ create or replace function public.online_code_is_valid(p_code text)
 returns boolean
 language sql
 immutable
+set search_path = public, pg_temp
 as $$
   select p_code ~ '^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$';
 $$;
@@ -205,6 +211,7 @@ create or replace function public.online_generate_join_code()
 returns text
 language sql
 volatile
+set search_path = public, pg_temp
 as $$
   with raw as (
     select decode(replace(gen_random_uuid()::text, '-', ''), 'hex') as bytes
@@ -239,6 +246,7 @@ create or replace function public.online_room_id_from_topic(p_topic text)
 returns uuid
 language plpgsql
 immutable
+set search_path = public, pg_temp
 as $$
 begin
   return split_part(p_topic, ':', 2)::uuid;
@@ -251,6 +259,7 @@ $$;
 create or replace function public.online_touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   new.updated_at := now();

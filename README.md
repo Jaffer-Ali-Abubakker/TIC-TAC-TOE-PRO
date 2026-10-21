@@ -171,6 +171,18 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
+> The **direct** database host (`db.<ref>.supabase.co`) is often unreachable from
+> residential networks, because it is IPv6-only on many projects. The
+> **pooler** host works everywhere:
+>
+> ```powershell
+> supabase db push --db-url "postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres"
+> ```
+>
+> `<region>` is the project's region (Supabase -> Project Settings -> Database).
+> You can find it by trying the pooler hosts until one does not answer
+> *"tenant/user not found"*.
+
 **Option B - SQL editor**
 
 1. Open *SQL Editor -> New query* in the Supabase dashboard.
