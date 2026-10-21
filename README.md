@@ -194,6 +194,18 @@ The migration is idempotent: re-running it is safe.
 Without this, the online mode cannot create a guest session and shows
 "A guest session could not be created".
 
+You can also flip the switch from the command line:
+
+```powershell
+npm run setup:anonymous
+```
+
+It asks for a Supabase personal access token, enables the provider through
+the Management API and then verifies the result through the public
+`/auth/v1/settings` endpoint. The token is read with a hidden prompt and is
+never written to disk, printed or passed as a command line argument. The
+project ref and publishable key are read from your `.env` automatically.
+
 ### 4. Configure Realtime
 
 1. Go to *Realtime -> Realtime Authorization* (or *Settings -> Realtime*) and
