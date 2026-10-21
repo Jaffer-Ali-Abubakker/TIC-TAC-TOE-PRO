@@ -734,16 +734,23 @@ If you touch the database, also run `npm run test:db` and re-run
 
 These need **your** accounts and cannot be checked from this workspace:
 
-1. **A hosted Supabase project.** The migration, the RLS policies and the RPCs were verified
-   against a real PostgreSQL engine, but not against Supabase's hosted stack (GoTrue, PostgREST,
-   Realtime, the `auth` schema, the `supabase_realtime` publication).
-2. **Realtime delivery between two devices.** The client was verified against a mock
-   PostgREST/Auth server; the Supabase Realtime websocket was not available locally, so the
-   client fell back to polling (which works). Enable *Realtime Authorization* in the dashboard
-   before relying on the realtime path.
-3. **A production deployment.** `npm run build` succeeds and `vercel.json` / `netlify.toml`
-   are correct, but nothing has been deployed.
-4. **Anonymous sign-in in a real project.** The dashboard toggle has to be enabled.
+1. **Realtime *presence*** (the "opponent is online" dot) needs **Realtime → Realtime
+   Authorization → private channels** enabled in the Supabase dashboard. Without it the
+   board still synchronises (public `postgres_changes` + the 2.5 s polling fallback),
+   but presence shows "Opponent appears to be offline". Cosmetic only.
+2. **The old project still owns `tic-tac-toe-pro.vercel.app`.** It is a completely
+   different, older static site. Our app is deployed at
+   `https://tic-tac-toe-pro-eosin.vercel.app/`. Rename or delete the old project to
+   free the clean domain.
+3. **A CAPTCHA for public deployments** is still not implemented (§15).
+
+**Verified live on 2026-10-21** against `https://tic-tac-toe-pro-eosin.vercel.app/`:
+two independent browsers (separate Chrome profiles, therefore separate anonymous
+Supabase sessions) created a room, joined it via the invite link and played a move
+each way. Both boards converged on `X...O....` and the database recorded
+`status=active, version=4, 2 seats, 2 moves` in `online_moves`. The database tests,
+the security script and `npm run verify:db` all pass against the hosted project.
+
 
 The exact steps are in the README under *Online multiplayer setup*.
 

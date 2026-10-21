@@ -757,6 +757,9 @@ Standard Tic-Tac-Toe:
   disabled with a clear setup message; the local modes are unaffected.
 - Realtime presence is best effort. A player whose browser closes may still
   look "online" for a moment. Presence is never used to award a win.
+  Presence additionally needs **Realtime → Realtime Authorization → private
+  channels** enabled; without it the board still synchronises but the opponent's
+  dot reads "Opponent appears to be offline". Cosmetic only.
 - The client falls back to polling every 2.5 seconds if realtime is
   unavailable. The game still works, just with a slightly higher latency.
 - Rooms expire after two hours. There is no automatic deletion - run
