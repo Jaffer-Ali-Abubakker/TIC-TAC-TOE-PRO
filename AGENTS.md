@@ -594,7 +594,23 @@ be removed by the job.
 
 ---
 
-## 15. Visual QA workflow (headless Chrome)
+## 15. Installed Agent Skills (and when NOT to use them)
+
+`.agents/skills/` contains three skills installed from the official Supabase repositories:
+
+| Skill | Applies here? |
+| --- | --- |
+| `supabase` | ✅ Yes — general Supabase guidance (auth, RLS, Realtime, migrations, debugging). |
+| `supabase-postgres-best-practices` | ✅ Yes — load it **before** changing anything in `supabase/migrations/`. It already caught a real RLS-bypass vulnerability (trap 21). |
+| `supabase-server` | ❌ **No.** It covers `@supabase/server`, Edge Functions, Hono apps and inbound-auth middleware. **This project has no server.** The backend is entirely PostgreSQL (RPC functions + Row Level Security) and the frontend is a static SPA. Do **not** add `supabase/functions/`, `@supabase/server`, `SUPABASE_SECRET_KEY` or `SUPABASE_JWKS_URL` to this repository unless the user explicitly asks for an edge function. |
+
+**The one legitimate use case for an edge function** would be a CAPTCHA-gated room-creation
+proxy for a public deployment (the database rate limit cannot verify a CAPTCHA). That is
+deliberately not implemented — see §16.
+
+---
+
+## 16. Visual QA workflow (headless Chrome)
 
 The machine has Chrome and Edge. A plain `--screenshot` call is limited by a minimum window
 width, so **verify narrow viewports through an iframe harness**:
@@ -619,7 +635,7 @@ development aid only and is **not** part of the repository.
 
 ---
 
-## 16. Known limitations (intentional)
+## 17. Known limitations (intentional)
 
 - Local only for the local modes; the online mode needs a Supabase project.
 - **Anonymous sessions are device/browser specific.** Clearing site data or losing the session
@@ -634,20 +650,23 @@ development aid only and is **not** part of the repository.
 
 ---
 
-## 17. Possible next steps (not implemented — do not describe them as if they exist)
+## 18. Possible next steps (not implemented — do not describe them as if they exist)
 
 - E2E tests with Playwright against a real Supabase project.
 - A signed-in account system on top of the anonymous session.
 - Chat or emote between players.
 - A server-side match history table (the current history is per browser).
 - A "best of N" online match format.
+- An edge function that fronts room creation with a CAPTCHA (see §15 - this would be the
+  first server-side code in the project, and needs `SUPABASE_SECRET_KEY` in the edge
+  function environment, never in the frontend).
 
 If you add any of these, also update `README.md` **and** this file, and keep the README honest —
 never document a command or a feature that does not exist.
 
 ---
 
-## 18. Definition of done for any future change
+## 19. Definition of done for any future change
 
 A change is complete when **all** of the following are true and have actually been run:
 
@@ -666,7 +685,7 @@ If you touch the database, also run `npm run test:db` and re-run
 
 ---
 
-## 19. Change log of the work completed so far
+## 20. Change log of the work completed so far
 
 **Phase 1 — the local game**
 
@@ -695,7 +714,7 @@ If you touch the database, also run `npm run test:db` and re-run
 
 ---
 
-## 20. What is still unverified
+## 21. What is still unverified
 
 These need **your** accounts and cannot be checked from this workspace:
 
