@@ -9,6 +9,7 @@
  * This test fails the build if a secret key ever reaches the repository, and
  * if the .env file is ever committed.
  */
+import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,8 +24,12 @@ const SECRET_KEY_PATTERN = /sb_secret_[A-Za-z0-9_-]{20,}/
 /**
  * A Postgres connection string that carries a password, for example
  * postgresql://postgres:hunter2@db.example.supabase.co:5432/postgres
+ *
+ * Obvious placeholders (<password>, [YOUR-PASSWORD], your-password, xxxxx)
+ * are allowed so the documentation can show the shape of a connection string.
  */
-const CONNECTION_STRING_PATTERN = /postgres(?:ql)?:\/\/[^:\s@/]+:[^@\s/]+@/
+const CONNECTION_STRING_PATTERN =
+  /postgres(?:ql)?:\/\/[^:\s@/]+:(?!<[^>]*>|\[[^\]]*\]|your[-_]?password|password|x{3,})[^@\s/]+@/i
 
 const IGNORED_DIRECTORIES = new Set([
   'node_modules',
@@ -49,8 +54,31 @@ function collectFiles(directory: string, found: string[] = []): string[] {
   return found
 }
 
+/**
+ * The files Git would actually commit: everything tracked, plus untracked
+ * files that are not ignored.
+ *
+ * A file that is git-ignored (like `.env.local`, which legitimately holds the
+ * database password for the CLI) is not a leak - it can never be committed.
+ * Outside a git repository we fall back to scanning the whole tree.
+ */
+function listCommittableFiles(): string[] {
+  try {
+    const output = execFileSync(
+      'git',
+      ['ls-files', '--cached', '--others', '--exclude-standard'],
+      { cwd: projectRoot, encoding: 'utf8' },
+    )
+    const files = output.split(/\r?\n/).filter(Boolean).map((file) => join(projectRoot, file))
+    if (files.length > 0) return files
+  } catch {
+    // Not a git repository - fall through to the filesystem scan.
+  }
+  return collectFiles(projectRoot)
+}
+
 describe('secret hygiene', () => {
-  const files = collectFiles(projectRoot)
+  const files = listCommittableFiles()
 
   it('finds no Supabase secret key in the repository', () => {
     const offenders: string[] = []
@@ -72,6 +100,12 @@ describe('secret hygiene', () => {
 
   it('keeps the .env file out of git', () => {
     expect(gitignore).toMatch(/^\.env$/m)
+    expect(gitignore).toMatch(/!\.env\.example/)
+  })
+
+  it('keeps every local env file out of git', () => {
+    // .env, .env.local, .env.production ... but .env.example stays tracked.
+    expect(gitignore).toMatch(/^\.env\.\*$/m)
     expect(gitignore).toMatch(/!\.env\.example/)
   })
 
