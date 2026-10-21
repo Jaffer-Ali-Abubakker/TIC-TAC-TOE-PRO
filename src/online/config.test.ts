@@ -49,6 +49,31 @@ describe('readOnlineConfig', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
+    // The runtime origin IS the deployed domain, so invite links stay correct
+    // even when VITE_APP_URL is not known at build time.
+    expect(result.config.appUrl).toBe(window.location.origin)
     expect(result.config.appUrl).toMatch(/^https?:\/\//)
+  })
+
+  it('prefers an explicitly configured app url', () => {
+    const result = readOnlineConfig({
+      VITE_SUPABASE_URL: 'https://abc.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'key',
+      VITE_APP_URL: 'https://play.example.com',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.config.appUrl).toBe('https://play.example.com')
+  })
+
+  it('ignores a malformed app url and falls back to the origin', () => {
+    const result = readOnlineConfig({
+      VITE_SUPABASE_URL: 'https://abc.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'key',
+      VITE_APP_URL: 'not-a-url',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.config.appUrl).toBe(window.location.origin)
   })
 })

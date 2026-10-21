@@ -110,8 +110,10 @@ VITE_SUPABASE_URL=https://abcdefghijklmnop.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxx
 
 # The public URL of this application. Used to build invite links.
-# Must be the deployed address - never http://localhost.
-VITE_APP_URL=https://tic-tac-toe-pro.vercel.app
+# OPTIONAL - leave it empty and the app uses the address the player is
+# currently on, which is always correct. Set it to pin the domain.
+# Never use http://localhost here.
+VITE_APP_URL=
 ```
 
 ### Let the script fill it in for you
