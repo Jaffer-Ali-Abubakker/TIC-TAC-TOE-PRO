@@ -96,7 +96,7 @@ $expected = @{
   realtime_published_expected_1 = 1
   grants_ok_expected_6          = 6
   payload_locked_expected_1     = 1
-  migration_recorded_expected_1 = 1
+  migrations_recorded_expected_2 = 2
 }
 
 $failed = $false

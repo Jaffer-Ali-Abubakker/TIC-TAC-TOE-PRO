@@ -9,7 +9,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Cell, Player } from '../game/types'
 import { normalizeRoomCode } from './roomCode'
+import type { Database } from './database.types'
 import { OnlineError, type OnlineErrorCode, type OnlineRoom, type OnlineRoomState } from './types'
+
+/**
+ * The RPC argument shapes are taken from the generated database types, so a
+ * renamed parameter in the SQL shows up as a TypeScript error here.
+ */
+type RpcName = keyof Database['public']['Functions']
+type RpcArgs<F extends RpcName> = Database['public']['Functions'][F]['Args']
 
 /** Friendly, user facing text for every error the server can produce. */
 const ERROR_MESSAGES: Record<OnlineErrorCode, string> = {
@@ -138,12 +146,12 @@ export function parseOnlineRoomState(raw: unknown): OnlineRoomState | null {
   return { room, players, mySymbol }
 }
 
-async function callRpc(
+async function callRpc<F extends RpcName>(
   client: SupabaseClient,
-  name: string,
-  args: Record<string, unknown>,
+  name: F,
+  args: RpcArgs<F>,
 ): Promise<unknown> {
-  const { data, error } = await client.rpc(name, args)
+  const { data, error } = await client.rpc(name, args as never)
   if (error) throw toOnlineError(error)
   return data
 }
@@ -195,7 +203,12 @@ export async function submitOnlineMove(
   options: {
     joinCode: string
     cellIndex: number
-    expectedVersion: number | null
+    /**
+     * The version the client based its move on. The database rejects the move
+     * when the room has moved on, which is what makes two simultaneous moves
+     * safe. Always sent - it is the compare-and-swap guard.
+     */
+    expectedVersion: number
     moveId: string
   },
 ): Promise<OnlineRoomState> {

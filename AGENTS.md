@@ -423,6 +423,15 @@ regression.
 25. **The direct database host may be unreachable.** `db.<ref>.supabase.co` is IPv6-only on many
     projects; use the pooler host (`aws-0-<region>.pooler.supabase.com:6543`, user
     `postgres.<ref>`) instead. The wrong region answers *"tenant/user ... not found"*.
+26. **The `authenticated_security_definer_function_executable` advisor is expected.** It fires for
+    the six game RPCs and `online_is_room_member`, which are `SECURITY DEFINER` **on purpose** -
+    they are the only way in, and they authorise every action internally. Do **not** "fix" it by
+    revoking their `EXECUTE` grant: the online mode stops working immediately. The one function
+    that must not be client-callable is `online_room_payload` (trap 21), and that one *is* revoked.
+27. **The database types are generated, not hand-written.** `src/online/database.types.ts` comes
+    from `supabase gen types typescript --db-url "<pooler url>" --schema public`. Regenerate it
+    after any schema change, otherwise `Database['public']['Tables']` and the RPC argument shapes
+    drift away from the real schema.
 
 ---
 

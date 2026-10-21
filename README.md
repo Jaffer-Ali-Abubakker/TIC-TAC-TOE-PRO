@@ -380,6 +380,36 @@ constraint is what makes a retried move idempotent.
 
 ## Security model
 
+### A note on `supabase db advisors`
+
+Supabase's own linter reports one warning on this project:
+
+> **Signed-In Users Can Execute SECURITY DEFINER Function** (7 findings)
+
+**This is expected and intentional.** The six game functions
+(`create_online_room`, `join_online_room`, `get_online_room_state`,
+`submit_online_move`, `request_online_rematch`, `leave_online_room`) plus the
+`online_is_room_member` helper are `SECURITY DEFINER` **on purpose**:
+
+- They are the *only* way a client can touch the game state. The tables have
+  no write policies, so without `SECURITY DEFINER` the functions could not
+  write the board.
+- They must derive the player from `auth.uid()` and enforce every rule
+  server-side, which is exactly what `SECURITY DEFINER` enables.
+- They are guarded by strict authorisation inside the function body
+  (membership, turn, version, cell) and by the RLS policies on the tables.
+
+The linter's own remediation text says *"Revoke `EXECUTE` … **if that is not
+intentional**."* Here it is intentional — the `anon` role can call none of
+them, and the one `SECURITY DEFINER` function that must not be client-callable
+(`online_room_payload`, which takes an arbitrary user id) is revoked from every
+client role. `npm run verify:db` asserts exactly that.
+
+The linter also reports two `unused_index` INFO notices. Both indexes are
+needed (`online_rooms_expires_at_idx` for the expiry sweep,
+`online_moves_user_id_idx` for the foreign key); they are only "unused"
+because the tables are still empty.
+
 - **The browser never writes game state.** `online_rooms`, `online_room_players`
   and `online_moves` have no `INSERT`/`UPDATE`/`DELETE` policy for the
   `authenticated` role, and their write privileges are revoked. A client can
