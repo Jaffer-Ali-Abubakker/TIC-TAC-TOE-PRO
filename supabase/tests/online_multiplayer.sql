@@ -262,6 +262,30 @@ $$;
 commit;
 
 -- -----------------------------------------------------------------------------
+-- 5b. The payload builder must not be callable through the API
+-- -----------------------------------------------------------------------------
+-- public.online_room_payload is SECURITY DEFINER and takes an arbitrary user
+-- id. If anon or authenticated could call it directly they would bypass RLS
+-- and be able to read any room by passing its id.
+do $$
+declare
+  v_anon boolean;
+  v_authenticated boolean;
+begin
+  select
+    has_function_privilege('anon', 'public.online_room_payload(uuid,uuid)', 'execute'),
+    has_function_privilege('authenticated', 'public.online_room_payload(uuid,uuid)', 'execute')
+  into v_anon, v_authenticated;
+
+  if v_anon or v_authenticated then
+    raise exception 'FAIL: online_room_payload is callable by a client and bypasses RLS';
+  end if;
+
+  raise notice 'PASS: the payload builder is not callable through the API';
+end
+$$;
+
+-- -----------------------------------------------------------------------------
 -- 6. Illegal moves are rejected
 -- -----------------------------------------------------------------------------
 do $$

@@ -407,6 +407,15 @@ regression.
 20. **The Supabase client must stay dynamically imported.** A static import pushed the main chunk
     over 500 kB. `getSupabaseClient()` returns a promise and the library is only fetched when the
     online mode is used.
+21. **`online_room_payload()` must never be executable by a client.** It is `SECURITY DEFINER` and
+    takes an arbitrary user id, so if `anon` or `authenticated` could call it they would bypass
+    RLS and read any room by passing its id. It is revoked from every client role and is only
+    called from inside the game functions (which run as the owner). **This was a real vulnerability,
+    found by auditing the migration against the Supabase Postgres best-practices skill.**
+22. **`updated_at` cannot be back-dated.** The `online_rooms_touch_updated_at` trigger resets it to
+    `now()` on every write, so age-based logic must use `expires_at` instead.
+23. **RLS policies should use `(select auth.uid())`.** Wrapping it in a sub-query lets the planner
+    evaluate it once as an InitPlan instead of per row.
 
 ---
 
@@ -513,6 +522,7 @@ public API is:
 | `request_online_rematch` | `(p_join_code text) → jsonb` | Sets the caller's rematch flag; starts a new round once both are set. |
 | `leave_online_room` | `(p_join_code text) → jsonb` | Removes the membership and expires / finishes the room. |
 | `online_expire_rooms` | `() → int` | Marks abandoned rooms as expired. **Operations only** — not granted to `authenticated`. |
+| `online_purge_expired_rooms` | `(p_older_than interval) → int` | Deletes rooms expired for longer than the interval, cascading to their seat rows and move log. **Operations only.** |
 
 Every client-facing error uses the `online:<code>` vocabulary. The complete list, and what the
 UI shows for it:
@@ -560,6 +570,8 @@ Key properties of the layer:
 - RLS is enabled on all three tables. `SELECT` is granted to `authenticated`; every write
   privilege is revoked and there are no write policies.
 - The functions are executable by `authenticated` only; `anon` and `PUBLIC` are revoked.
+- `online_room_payload()` is revoked from **every** client role: it is `SECURITY DEFINER` and takes
+  an arbitrary user id, so a client that could call it would bypass RLS (see trap 21).
 - `online_is_room_member()` is `SECURITY DEFINER` so the policies can call it without recursing.
 - Room codes are generated from `gen_random_uuid()` (the OS CSPRNG) mapped onto a 32 character
   alphabet, 8 characters = 2^40 possibilities.

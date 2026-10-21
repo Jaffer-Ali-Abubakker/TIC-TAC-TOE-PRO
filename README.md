@@ -328,6 +328,7 @@ constraint is what makes a retried move idempotent.
 | `request_online_rematch(code)`      | Requests/accepts a rematch                                |
 | `leave_online_room(code)`           | Leaves the room                                            |
 | `online_expire_rooms()`             | Marks abandoned rooms as expired (operations only)        |
+| `online_purge_expired_rooms(interval)` | Deletes long-expired rooms and their move log (operations only) |
 
 ## Security model
 
@@ -341,7 +342,10 @@ constraint is what makes a retried move idempotent.
   its own symbol, its own seat or declare itself the winner.
 - **The public execute grant is revoked** and only `authenticated` may call
   the game functions. The `anon` role (requests without a session) can do
-  nothing at all.
+  nothing at all. The internal `online_room_payload()` builder is `SECURITY
+  DEFINER` and takes an arbitrary user id, so its execute grant is revoked
+  from every client role - otherwise a caller could read any room directly
+  and bypass RLS entirely.
 - **Row Level Security** limits every read to the caller's own room. The
   `online_is_room_member()` helper is `SECURITY DEFINER` so the policies can
   call it without recursing.
@@ -492,6 +496,15 @@ select cron.schedule(
   '*/10 * * * *',
   'select public.online_expire_rooms();'
 );
+```
+
+To actually reclaim the disk space, purge rooms that have been expired for
+more than a day. This removes the room together with its seat rows and its
+move log (both cascade):
+
+```sql
+select public.online_purge_expired_rooms();          -- default: older than 24 hours
+select public.online_purge_expired_rooms('7 days');  -- keep a week of history
 ```
 
 Rooms are never deleted while they are active, so a live match can not be

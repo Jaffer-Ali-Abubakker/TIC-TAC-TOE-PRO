@@ -13,6 +13,7 @@ import { createTestDatabase, type TestDatabase } from './harness'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const SCRIPT_PATH = resolve(here, 'online_multiplayer.sql')
+const MIGRATION_PATH = resolve(here, '../migrations/0001_online_multiplayer.sql')
 
 let database: TestDatabase
 
@@ -35,4 +36,27 @@ describe('the SQL editor security script', () => {
     expect(rows[0].rooms).toBe(0)
     expect(rows[0].players).toBe(0)
   })
+})
+
+describe('the migration', () => {
+  it('is idempotent and can be re-applied to an existing project', async () => {
+    // The user re-runs the migration in the SQL editor, so it has to be safe.
+    const migration = readFileSync(MIGRATION_PATH, 'utf8')
+    await expect(database.exec(migration)).resolves.toBeUndefined()
+
+    const { rows } = await database.query<{ tables: number; functions: number; policies: number }>(
+      `select
+         (select count(*)::int from pg_tables where schemaname = 'public'
+           and tablename in ('online_rooms','online_room_players','online_moves')) as tables,
+         (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname in (
+             'create_online_room','join_online_room','get_online_room_state',
+             'submit_online_move','request_online_rematch','leave_online_room',
+             'online_purge_expired_rooms')) as functions,
+         (select count(*)::int from pg_policies where schemaname = 'public') as policies`,
+    )
+    expect(rows[0].tables).toBe(3)
+    expect(rows[0].functions).toBe(7)
+    expect(rows[0].policies).toBe(3)
+  }, 120_000)
 })

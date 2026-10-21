@@ -797,6 +797,33 @@ begin
 end;
 $$;
 
+-- Removes rooms that have been expired for a while, together with their seat
+-- rows and their move log (both cascade).
+--
+-- This is the destructive half of the cleanup and is deliberately separate from
+-- online_expire_rooms(): a room that is merely expired is still readable, and
+-- an ACTIVE match is never touched.
+--
+-- The age is measured from `expires_at` rather than `updated_at`, because the
+-- updated_at trigger always resets it to now() on every write.
+create or replace function public.online_purge_expired_rooms(p_older_than interval default interval '24 hours')
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_count integer;
+begin
+  delete from public.online_rooms
+   where status = 'expired'
+     and expires_at < now() - p_older_than;
+
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 5. Row Level Security
 -- -----------------------------------------------------------------------------
@@ -825,7 +852,7 @@ create policy "Members can read their own room"
   on public.online_rooms
   for select
   to authenticated
-  using (public.online_is_room_member(id, auth.uid()));
+  using (public.online_is_room_member(id, (select auth.uid())));
 
 -- Members may read the seat rows of their own room (needed by the realtime
 -- subscription and harmless: it only exposes their own room).
@@ -834,7 +861,7 @@ create policy "Members can read their own room seats"
   on public.online_room_players
   for select
   to authenticated
-  using (public.online_is_room_member(room_id, auth.uid()));
+  using (public.online_is_room_member(room_id, (select auth.uid())));
 
 -- The move log is readable by members of the room. It is never writable by a
 -- client - only submit_online_move() inserts into it.
@@ -843,7 +870,7 @@ create policy "Members can read the move log of their room"
   on public.online_moves
   for select
   to authenticated
-  using (public.online_is_room_member(room_id, auth.uid()));
+  using (public.online_is_room_member(room_id, (select auth.uid())));
 
 -- There are deliberately NO insert / update / delete policies for the
 -- `authenticated` role: clients cannot create rooms, join rooms, change the
@@ -873,12 +900,20 @@ grant execute on function public.leave_online_room(text) to authenticated;
 -- The expiry sweep is an operational task, not a client operation.
 revoke all on function public.online_expire_rooms() from public, anon, authenticated;
 grant execute on function public.online_expire_rooms() to service_role;
+revoke all on function public.online_purge_expired_rooms(interval) from public, anon, authenticated;
+grant execute on function public.online_purge_expired_rooms(interval) to service_role;
 
 -- Read only helpers used by the RLS policies.
 revoke all on function public.online_is_room_member(uuid, uuid) from public, anon;
 grant execute on function public.online_is_room_member(uuid, uuid) to authenticated;
 revoke all on function public.online_room_id_from_topic(text) from public, anon;
 grant execute on function public.online_room_id_from_topic(text) to authenticated;
+
+-- The payload builder is SECURITY DEFINER and takes an arbitrary user id, so it
+-- must NOT be callable through the API: otherwise a client could bypass RLS
+-- and read any room by passing its id. It is only ever called from inside the
+-- game functions above, which run as the owner and keep EXECUTE implicitly.
+revoke all on function public.online_room_payload(uuid, uuid) from public, anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- 7. Realtime
@@ -922,7 +957,7 @@ begin
           realtime.topic() like 'online-room:%'
           and public.online_is_room_member(
             public.online_room_id_from_topic(realtime.topic()),
-            auth.uid()
+            (select auth.uid())
           )
         );
     $policy$;

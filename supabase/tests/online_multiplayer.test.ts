@@ -598,6 +598,58 @@ describe('leaving a room', () => {
   })
 })
 
+describe('function privileges', () => {
+  it('does not let anon or authenticated call the payload builder directly', async () => {
+    // online_room_payload is SECURITY DEFINER and takes an arbitrary user id.
+    // If it were callable from the API a client could bypass RLS and read any
+    // room by passing its id.
+    const { rows } = await database.query<{ anon: boolean; authenticated: boolean }>(
+      `select
+         has_function_privilege('anon', 'public.online_room_payload(uuid,uuid)', 'execute') as anon,
+         has_function_privilege('authenticated', 'public.online_room_payload(uuid,uuid)', 'execute') as authenticated`,
+    )
+    expect(rows[0].anon).toBe(false)
+    expect(rows[0].authenticated).toBe(false)
+  })
+
+  it('does not let anon call any of the game functions', async () => {
+    const { rows } = await database.query<{ count: number }>(
+      `select count(*)::int as count
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in (
+            'create_online_room','join_online_room','get_online_room_state',
+            'submit_online_move','request_online_rematch','leave_online_room')
+          and has_function_privilege('anon', p.oid, 'execute')`,
+    )
+    expect(rows[0].count).toBe(0)
+  })
+
+  it('does not let authenticated call the operational cleanup functions', async () => {
+    const { rows } = await database.query<{ count: number }>(
+      `select count(*)::int as count
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in ('online_expire_rooms','online_purge_expired_rooms')
+          and (has_function_privilege('anon', p.oid, 'execute')
+               or has_function_privilege('authenticated', p.oid, 'execute'))`,
+    )
+    expect(rows[0].count).toBe(0)
+  })
+
+  it('still lets a member read their own room through the table', async () => {
+    const created = await createRoom()
+    await database.setRole('authenticated')
+    const { rows } = await database.query<{ count: number }>(
+      `select count(*)::int as count from public.online_rooms where id = $1`,
+      [created.room.id],
+    )
+    expect(rows[0].count).toBe(1)
+  })
+})
+
 describe('expiry sweep', () => {
   it('marks abandoned rooms as expired and is safe to rerun', async () => {
     const created = await createRoom()
@@ -614,5 +666,54 @@ describe('expiry sweep', () => {
       `select public.online_expire_rooms() as expired`,
     )
     expect(again[0].expired).toBe(0)
+  })
+
+  it('purges long expired rooms together with their move log', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+    await database.setUser(ALICE)
+    await rpc(`select public.submit_online_move($1, 0, null, gen_random_uuid())`, [
+      created.room.joinCode,
+    ])
+
+    // Mark the room as expired and old enough to be purged.
+    await database.exec(
+      `update public.online_rooms
+          set status = 'expired', expires_at = now() - interval '48 hours'
+        where id = '${created.room.id}'`,
+    )
+
+    const { rows } = await database.query<{ purged: number }>(
+      `select public.online_purge_expired_rooms() as purged`,
+    )
+    expect(rows[0].purged).toBeGreaterThanOrEqual(1)
+
+    const { rows: left } = await database.query<{ rooms: number; moves: number }>(
+      `select
+         (select count(*)::int from public.online_rooms where id = $1) as rooms,
+         (select count(*)::int from public.online_moves where room_id = $1) as moves`,
+      [created.room.id],
+    )
+    expect(left[0].rooms).toBe(0)
+    expect(left[0].moves).toBe(0)
+  })
+
+  it('never purges an active match', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+    await database.setUser(ALICE)
+
+    await database.exec(
+      `update public.online_rooms set expires_at = now() - interval '48 hours' where id = '${created.room.id}'`,
+    )
+    await database.query(`select public.online_purge_expired_rooms()`)
+
+    const { rows } = await database.query<{ status: string }>(
+      `select status from public.online_rooms where id = $1`,
+      [created.room.id],
+    )
+    expect(rows[0].status).toBe('active')
   })
 })
