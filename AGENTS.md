@@ -37,22 +37,25 @@ Everything below was actually executed in this workspace, not merely planned.
 | --- | --- | --- |
 | Types | `npm run typecheck` | ✅ passes, 0 errors |
 | Lint | `npm run lint` | ✅ passes, 0 problems |
-| Tests | `npm run test:run` | ✅ **226 tests / 13 files, all passing** |
-| Database tests | `npm run test:db` | ✅ **37 tests** — the real migration on a real PostgreSQL engine |
+| Tests | `npm run test:run` | ✅ **245 tests / 14 files, all passing** |
+| Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
 | Build | `npm run build` | ✅ succeeds → `dist/` (304 kB JS / 93 kB gzip + a 214 kB lazy Supabase chunk) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
-| Visual QA | headless Chrome (§15) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs |
+| Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs |
 | Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 320 / scrollWidth 320` — none, in every mode |
-| Online end-to-end | mock PostgREST/Auth server + headless Chrome | ✅ create → invite → join → move → turn change, all via the real RPC surface |
+| Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 2 migrations recorded |
+| Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
+| **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
+| **Live two-player match** | two Chrome profiles via CDP (§16) | ✅ create → invite → join → move each way; both boards converged on `X...O....`; DB recorded `status=active, version=4, 2 seats, 2 moves` |
 | Dependency audit | `npm install` | ✅ 0 vulnerabilities |
 
-**Environment used for verification:** Windows 11, PowerShell, Node `v22.23.2`, npm `10.9.8`.
+**Environment used for verification:** Windows 11, PowerShell, Node `v22.23.2`, npm `10.9.8`,
+Chrome (headless, DevTools Protocol).
 
-**Not verified (needs your Supabase account):** a real hosted Supabase project,
-Realtime delivery between two physical devices, and a production deployment.
-See §20.
+**Still on your side:** Realtime *private channel authorization* (presence only) and renaming the
+older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 
 ---
 
@@ -127,6 +130,8 @@ eslint-plugin-react-hooks 7.1.1  eslint-plugin-react-refresh 0.5.7
 @eslint/js 10.0.1       globals 17.13.0
 ```
 
+Also installed on the dev machine: `supabase` CLI 2.121.0 and Chrome (used by the CDP driver).
+
 Runtime dependencies: `react`, `react-dom`, `lucide-react`,
 `@supabase/supabase-js`. **Keep it that way.**
 
@@ -197,8 +202,9 @@ Node **22.13+** is the practical requirement.
 | `config.ts` | Reads and validates `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_APP_URL`. Returns `{ ok: true, config }` or `{ ok: false, error, missing }` with a human readable message. |
 | `supabase.ts` | Creates the Supabase client **lazily and dynamically** (`import('@supabase/supabase-js')`), so the library is only downloaded when the online mode is used. `getOnlineConfig`, `isOnlineConfigured`, `getSupabaseClient`, `resetSupabaseClient` (tests). |
 | `roomCode.ts` | `normalizeRoomCode`, `isValidRoomCode`, `formatRoomCode`, `buildInviteLink`, `parseRoomCodeFromUrl`, `sanitizeDisplayName`, `stripControlCharacters`, `isValidDisplayName`, `createMoveId`. Pure, no Supabase import. |
-| `onlineApi.ts` | Typed wrappers around the RPC functions (`createOnlineRoom`, `joinOnlineRoom`, `fetchOnlineRoomState`, `submitOnlineMove`, `requestOnlineRematch`, `leaveOnlineRoom`), the `online:<code>` → friendly message mapping, `parseOnlineErrorCode`, `toOnlineError` and `parseOnlineRoomState` (validates the payload before it reaches the UI). |
-| `useOnlineSession.ts` | Anonymous sign-in. `getSession()` → `signInAnonymously()` fallback, `onAuthStateChange` for token refresh, `ensureSession()`. |
+| `onlineApi.ts` | Typed wrappers around the RPC functions (`createOnlineRoom`, `joinOnlineRoom`, `fetchOnlineRoomState`, `submitOnlineMove`, `requestOnlineRematch`, `leaveOnlineRoom`), the `online:<code>` → friendly message mapping, `parseOnlineErrorCode`, `toOnlineError` and `parseOnlineRoomState` (validates the payload before it reaches the UI). The RPC argument shapes come from `database.types.ts`, so a renamed SQL parameter becomes a type error. |
+| `database.types.ts` | **GENERATED**, never hand-edited. Produced by `npm run gen:types` from the live schema. `OnlineRoom` / `OnlinePlayer` in `types.ts` derive from it, and `onlineApi.ts` takes its RPC arguments from it. Regenerate after any schema change. |
+| `useOnlineSession.ts` | Anonymous sign-in. `getSession()` → `signInAnonymously()` fallback, `onAuthStateChange` for token refresh, `ensureSession()` (returns `{ userId, error, errorCode }` so a precise reason is never overwritten by a generic one). |
 | `useOnlineRoom.ts` | The room controller: create/join/leave, the realtime subscription, the 2.5 s polling safety net, move submission with a reusable move id, rematch, reconnection, the version guard, the connection status and the display name. |
 
 ### `src/components/online/`
@@ -224,17 +230,35 @@ share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 | `hooks/usePersistentState.ts` | Reads synchronously on mount, de-duplicates writes by serialised signature, probes storage availability once. |
 | `test/setup.ts` | jest-dom, cleanup, `matchMedia` / `scrollTo` polyfills. |
 | `test/fakeSupabase.ts` | A controllable fake Supabase client: per-RPC handlers, a fake auth layer and fake realtime channels with `emitChange` / `emitPresence`. |
+| `test/secrets.test.ts` | The secret-hygiene guard. Fails the build if a `sb_secret_...` key or a password-bearing connection string appears in a **commit-able** file (it uses `git ls-files --cached --others --exclude-standard`, so git-ignored files like `.env.local` are not false positives). |
+
+### `scripts/` — PowerShell helpers (no new npm dependencies)
+
+| File | Purpose |
+| --- | --- |
+| `setup-env.ps1` | Writes `.env` from the Supabase Management API. The personal access token is read with a hidden prompt and only held in memory. |
+| `setup-anonymous-signin.ps1` | Enables the anonymous sign-in provider through the Management API and verifies it via the public `/auth/v1/settings`. |
+| `verify-database.ps1` | Runs `supabase/tests/verify_hosted.sql` and compares every value with what the migration produces. Non-zero exit on any mismatch. |
+| `generate-types.ps1` | Regenerates `src/online/database.types.ts` from the live schema. |
 
 ### `supabase/`
 
 | File | Responsibility |
 | --- | --- |
 | `migrations/0001_online_multiplayer.sql` | The whole backend: tables, constraints, helper functions, the six client-facing RPCs, RLS policies, grants, the realtime publication and the private channel policy. |
+| `migrations/0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key (Postgres does not index FKs automatically). |
 | `config.toml` | Supabase CLI project configuration (anonymous sign-in and realtime authorization are enabled). |
+| `tsconfig.json` | TypeScript config for the SQL test files (they need the Node types). |
 | `tests/harness.ts` | Runs the real migration on PGlite with a small Supabase shim (`auth.users`, `auth.uid()`, the `authenticated`/`anon`/`service_role` roles). |
-| `tests/online_multiplayer.test.ts` | 35 database security and behaviour tests. |
-| `tests/online_multiplayer_sql.test.ts` | Executes the SQL editor script end to end. |
+| `tests/online_multiplayer.test.ts` | 41 database security and behaviour tests. |
+| `tests/online_multiplayer_sql.test.ts` | Executes the SQL editor script end to end, and proves the migration is idempotent. |
 | `tests/online_multiplayer.sql` | The script you paste into the Supabase SQL editor. |
+| `tests/verify_hosted.sql` | The hosted-database verification query used by `npm run verify:db`. |
+
+### `.agents/skills/` + `skills-lock.json`
+
+Supabase Agent Skills (`supabase`, `supabase-postgres-best-practices`, `supabase-server`),
+pinned by `skills-lock.json`. See §15 for when **not** to use them.
 
 ---
 
@@ -432,6 +456,17 @@ regression.
     from `supabase gen types typescript --db-url "<pooler url>" --schema public`. Regenerate it
     after any schema change, otherwise `Database['public']['Tables']` and the RPC argument shapes
     drift away from the real schema.
+28. **`VITE_APP_URL` must stay empty unless you know the domain.** It is optional: when it is
+    empty the app uses `window.location.origin`, which is always the address the player is on
+    (including on preview deployments). A stale or guessed value is baked into the bundle at build
+    time and sends every invite link to the wrong host. Changing it requires a **redeploy**.
+29. **Do not connect the Vercel "Supabase" integration.** It injects `SUPABASE_URL` /
+    `SUPABASE_ANON_KEY`, which Vite does not expose to the browser (only `VITE_`-prefixed
+    variables are), and it may create a second, empty Supabase project. Add the three `VITE_`
+    variables by hand instead.
+30. **A deployment can serve a completely different project.** Two Vercel projects in different
+    scopes can both be called `tic-tac-toe-pro`; the older one keeps the clean domain. Always
+    check the `<title>` and the asset paths of the deployed site before debugging the app.
 
 ---
 
@@ -606,7 +641,20 @@ select cron.schedule(
 ```
 
 `online_expire_rooms()` never touches a room that is still `active`, so a live match can never
-be removed by the job.
+be removed by the job. `online_purge_expired_rooms()` is the destructive half - it deletes rooms
+that have been expired for longer than the given interval (default 24 hours) together with their
+seat rows and their move log. Both are granted to `service_role` only.
+
+### Verifying the hosted database
+
+`npm run verify:db` runs `supabase/tests/verify_hosted.sql` and compares every value with what
+the migration produces: the table count, the game function count, the RLS policies, the realtime
+publication, the function grants, the `search_path` pinning, the `online_room_payload` lock and
+the recorded migration count. It exits non-zero on any mismatch.
+
+`supabase db advisors --db-url "<pooler url>"` is the second gate. The expected output is **one**
+`authenticated_security_definer_function_executable` warning (see trap 26) and no
+`unindexed_foreign_keys`.
 
 ---
 
@@ -622,7 +670,35 @@ be removed by the job.
 
 **The one legitimate use case for an edge function** would be a CAPTCHA-gated room-creation
 proxy for a public deployment (the database rate limit cannot verify a CAPTCHA). That is
-deliberately not implemented — see §16.
+deliberately not implemented — see §18.
+
+### The Supabase MCP server
+
+Configured in `~/.config/opencode/opencode.json` (outside the repository - it is a personal
+machine setting, not project configuration):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref=<ref>&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching",
+      "enabled": true
+    }
+  }
+}
+```
+
+Authenticate once with `opencode mcp auth supabase` (a browser OAuth flow).
+
+It gives an agent `execute_sql`, `apply_migration`, `list_tables`, `list_migrations`,
+`get_advisors`, `generate_typescript_types`, `get_publishable_keys` and `search_docs`. Useful for
+inspecting the hosted project and for running the verification queries.
+
+> The `account` feature exposes the project and its keys but **not** the GoTrue provider config,
+> so the MCP server cannot enable anonymous sign-ins either. That toggle is a dashboard action
+> (or `npm run setup:anonymous` with a personal access token).
 
 ---
 
@@ -648,6 +724,30 @@ For the online mode you can additionally point the app at a throwaway mock of th
 Auth/PostgREST endpoints (a small Node `http` server) and drive a full create → invite → join →
 move session in the browser. That is how the online flow was verified locally. The mock is a
 development aid only and is **not** part of the repository.
+
+### Driving a real two-player match (no test dependency)
+
+To verify real multiplayer you need **two independent browsers**, not two tabs: two tabs share
+`localStorage`, so they would share the same anonymous Supabase session and land in the same seat.
+
+Node 22 ships a WebSocket client, so the Chrome DevTools Protocol can be driven with no npm
+dependency at all:
+
+1. Launch Chrome with `--headless=new --remote-debugging-port=<PORT> --user-data-dir=<fresh temp dir>`.
+2. `GET http://127.0.0.1:<PORT>/json/list` → the page target's `webSocketDebuggerUrl`.
+3. Connect, then `Page.navigate`, and `Runtime.evaluate` with `awaitPromise: true` to drive the DOM.
+4. Repeat with a **different `--user-data-dir` and a different `--remote-debugging-port`** for
+   player two.
+
+> **Trap:** two Chrome instances on the *same* debugging port do not fail loudly. The second
+> instance cannot bind the port, so `GET /json/list` keeps returning the **first** instance's
+> targets — and your "player two" silently drives player one's page. This cost a long debugging
+> session: player two appeared to "join" but the room never got a second seat, and player one
+> saw its own room as "Player 1 · YOU". Always use a unique port per instance, and confirm the
+> room actually has two seats in the database before trusting the browser output.
+
+Useful CDP domains: `Network` (request/response URLs and bodies), `Runtime.consoleAPICalled`,
+`Log.entryAdded`, `Runtime.evaluate`.
 
 ---
 
@@ -696,8 +796,19 @@ npm run build        # succeeds
 Plus, for anything user-visible: a headless-Chrome screenshot at desktop **and** 320 px, with
 `scrollWidth === clientWidth` confirmed for the narrow viewport.
 
-If you touch the database, also run `npm run test:db` and re-run
-`supabase/tests/online_multiplayer.sql` against the hosted project.
+If you touch the database, also run:
+
+```powershell
+npm run test:db      # the real migration on a real PostgreSQL engine
+npm run verify:db    # the hosted project matches the migration
+npm run gen:types    # regenerate src/online/database.types.ts
+```
+
+and re-run `supabase/tests/online_multiplayer.sql` against the hosted project in the SQL editor.
+
+For the online mode, also confirm a **live two-player match** with two independent browser
+profiles (§16) and check the room in the database afterwards - two seats, the expected moves and
+the expected version.
 
 ---
 
@@ -727,6 +838,24 @@ If you touch the database, also run `npm run test:db` and re-run
   script.
 - Fixed four real bugs found by the new tests: the RLS/privilege interaction, the mid-game
   rematch, the realtime channel temporal-dead-zone error and the missing `SELECT` grant.
+
+**Phase 3 — hardening, deployment and live verification**
+
+- Audited the migration with the Supabase Postgres best-practices skill and closed a **real RLS
+  bypass**: `online_room_payload` was `SECURITY DEFINER`, took an arbitrary user id and had never
+  been revoked, so `anon` could read any room through `/rest/v1/rpc/`.
+- Pinned `search_path` on **all 19** functions (the linter flagged 9) and added migration
+  `0002` for the unindexed `online_moves.user_id` foreign key. The hosted project now reports
+  **zero advisories**.
+- Switched the RLS policies to `(select auth.uid())` and added the destructive half of the
+  cleanup, `online_purge_expired_rooms()`.
+- Added the secret-hygiene guard (`src/test/secrets.test.ts`), the four `scripts/` helpers, the
+  generated `src/online/database.types.ts` and `npm run gen:types` / `verify:db`.
+- Installed the Supabase MCP server and the three Supabase Agent Skills; the
+  `supabase-postgres-best-practices` skill is what surfaced the RLS bypass.
+- Deployed to Vercel and verified a **live two-player match** with two independent Chrome
+  profiles over the DevTools Protocol (see §16). Both boards converged and the database recorded
+  the room, both seats and both moves.
 
 ---
 

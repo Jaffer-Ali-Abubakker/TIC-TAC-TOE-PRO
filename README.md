@@ -15,6 +15,8 @@ not the browser - decides whether a move is legal.
 > engineering handoff: architecture, invariants that must not be broken, the traps that will
 > bite you, the testing conventions and the visual-QA workflow.
 
+**Live demo:** <https://tic-tac-toe-pro-eosin.vercel.app/>
+
 ---
 
 ## Table of contents
@@ -23,6 +25,7 @@ not the browser - decides whether a move is legal.
 - [Technology stack](#technology-stack)
 - [Quick start](#quick-start)
 - [Environment configuration](#environment-configuration)
+- [Development tooling](#development-tooling)
 - [Online multiplayer setup](#online-multiplayer-setup)
   - [1. Create the Supabase project](#1-create-the-supabase-project)
   - [2. Apply the database migration](#2-apply-the-database-migration)
@@ -33,11 +36,13 @@ not the browser - decides whether a move is legal.
 - [How the online mode works](#how-the-online-mode-works)
 - [Database schema](#database-schema)
 - [Security model](#security-model)
+- [Error messages](#error-messages)
 - [Scripts](#scripts)
 - [Testing](#testing)
 - [Production build and deployment](#production-build-and-deployment)
 - [Testing with two devices](#testing-with-two-devices)
 - [Room lifecycle and expiry](#room-lifecycle-and-expiry)
+- [Responsive design](#responsive-design)
 - [Project structure](#project-structure)
 - [Game rules](#game-rules)
 - [AI difficulty levels](#ai-difficulty-levels)
@@ -144,6 +149,39 @@ npm run setup:env -- -ProjectRef abcdefghijklmnop -AppUrl https://my-app.vercel.
 > password or any other privileged secret in a `VITE_` variable, and never
 > commit a filled-in `.env` file. `.env` is already in `.gitignore`.
 
+### The database connection (CLI only)
+
+The Supabase CLI needs the **direct** database credentials. They are not needed
+by the app and must never reach the browser, so they live in a separate,
+git-ignored `.env.local`:
+
+```dotenv
+# Transaction mode pooler (IPv4 friendly) - the app / short queries
+DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Session mode pooler - use THIS one for `supabase db push`
+DIRECT_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+
+SUPABASE_DB_PASSWORD=<password>
+```
+
+> The direct host `db.<ref>.supabase.co` is IPv6-only on many projects and often
+> unreachable. Use the pooler. If the wrong region is used the server answers
+> *"tenant/user ... not found"*.
+
+`.env.local` is git-ignored, and `src/test/secrets.test.ts` fails the build if
+any commit-able file ever contains a secret key or a password-bearing
+connection string.
+
+## Development tooling
+
+| Tool | What it is for |
+| --- | --- |
+| **Supabase CLI** | Migrations (`db push`), type generation (`gen types`), SQL queries. |
+| **Supabase MCP server** | Lets an AI agent query the database, apply migrations and read advisors. Add it to `~/.config/opencode/opencode.json`, then run `opencode mcp auth supabase`. |
+| **Supabase Agent Skills** | Guidance for agents working with Supabase. Installed in `.agents/skills/` and pinned in `skills-lock.json`. |
+| **PGlite** | A real PostgreSQL engine in WASM. The database security tests run the **actual migration** against it, so no Docker and no hosted project are needed. |
+
 If the variables are missing or invalid, the application still starts: the
 local modes work normally and the online mode shows a panel listing exactly
 which variables are missing.
@@ -237,24 +275,6 @@ the Management API and then verifies the result through the public
 `/auth/v1/settings` endpoint. The token is read with a hidden prompt and is
 never written to disk, printed or passed as a command line argument. The
 project ref and publishable key are read from your `.env` automatically.
-
-### Verifying the hosted database
-
-After any change to the migration, re-apply it and check the result:
-
-```powershell
-# apply (session-mode pooler, from .env.local)
-supabase db push --db-url "<session mode pooler url>"
-
-# verify every object, policy, grant and privilege
-npm run verify:db
-```
-
-`verify:db` runs `supabase/tests/verify_hosted.sql` against the project and
-compares every value with what the migration produces - the table count, the
-function count, the RLS policies, the realtime publication, the function
-grants, the `search_path` pinning and the `online_room_payload` lock. It exits
-non-zero on any mismatch, so it can be used in CI.
 
 ### 4. Configure Realtime
 
@@ -458,7 +478,8 @@ because the tables are still empty.
 | `npm run test:coverage`  | Run the test suite with a coverage report.                  |
 | `npm run test:db`        | Run only the database security tests.                       |
 | `npm run test:online`    | Run only the online multiplayer tests.                      |
-| `npm run verify:db`      | Check the hosted database against the migration.             |
+| `npm run verify:db`      | Check the hosted database against the migration.            |
+| `npm run gen:types`      | Regenerate `src/online/database.types.ts` from the schema.  |
 | `npm run setup:env`      | Generate `.env` from the Supabase Management API.           |
 | `npm run setup:anonymous`| Enable anonymous sign-ins on your Supabase project.         |
 
@@ -468,7 +489,7 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 226 tests in 13 files:
+The suite has 245 tests in 14 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
@@ -500,6 +521,9 @@ The suite has 226 tests in 13 files:
   the exact `supabase/tests/online_multiplayer.sql` script you paste into the
   Supabase SQL editor, so the script itself is verified and not just the
   Vitest assertions.
+- **Secret hygiene** (`src/test/secrets.test.ts`) - fails the build if a
+  `sb_secret_...` key or a password-bearing connection string ever appears in
+  a commit-able file, and checks that `.env` / `.env.local` stay ignored.
 
 ## Production build and deployment
 
@@ -532,30 +556,44 @@ netlify deploy --build --prod
 
 `netlify.toml` is included with the build command and publish directory.
 
-Set the three environment variables in the hosting dashboard (they are baked
-into the build at deploy time):
+Set the environment variables in the hosting dashboard (they are baked into
+the build at deploy time):
 
 ```
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-VITE_APP_URL=https://<your-deployed-domain>
+VITE_APP_URL=                     # optional - leave empty to use the current origin
 ```
+
+> **`VITE_APP_URL` is optional and safer left empty.** When it is empty the app
+> uses `window.location.origin`, i.e. the address the player is actually on.
+> That is always right - including on preview deployments - and a stale or
+> guessed value can never break the invite links. Set it only if you want to
+> pin the domain, and remember that changing it requires a **redeploy**.
+
+> **Do not connect the "Optional Integrations -> Supabase" integration** when
+> creating the project. It injects `SUPABASE_URL` / `SUPABASE_ANON_KEY`, which
+> Vite does not expose to the browser (only `VITE_`-prefixed variables are),
+> and it may create a second, empty Supabase project. Add the three variables
+> by hand or press **Import .env**.
 
 ## Testing with two devices
 
-1. Deploy the app and make sure `VITE_APP_URL` matches the deployed address.
+1. Deploy the app.
 2. Open the deployed URL on device A, choose **Online**, press
    **Create private room**.
 3. Press **Copy invite link** and send the link (or the room code) to device
    B.
 4. On device B open the link. The invitation is shown - press
-   **Join this room**.
+   **Join this room**. The seat is never taken automatically, so a link
+   preview cannot occupy it.
 5. Both boards now show the same state. A move on one device appears on the
    other within a fraction of a second (or within 2.5 s if realtime is
    unavailable).
 
 You can also open the same room in two different browser profiles on one
-machine - but two devices is the honest test.
+machine - a normal window and an incognito window are two different anonymous
+players, which is enough to exercise the whole flow.
 
 ## Room lifecycle and expiry
 
@@ -646,17 +684,27 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 ├── vercel.json                    # Vercel deployment configuration
 ├── netlify.toml                   # Netlify deployment configuration
 ├── .env.example                   # Public environment variable template
+├── .agents/skills/                # Supabase Agent Skills (dev tooling)
+├── skills-lock.json               # Pinned versions of the installed skills
 ├── public/
 │   └── favicon.svg                # Local SVG favicon (no remote assets)
+├── scripts/
+│   ├── setup-env.ps1              # Generate .env from the Management API
+│   ├── setup-anonymous-signin.ps1 # Enable the anonymous sign-in provider
+│   ├── verify-database.ps1        # Compare the hosted DB with the migration
+│   └── generate-types.ps1         # Regenerate database.types.ts
 ├── supabase/
 │   ├── config.toml                # Supabase CLI project configuration
+│   ├── tsconfig.json              # TypeScript config for the SQL tests
 │   ├── migrations/
-│   │   └── 0001_online_multiplayer.sql   # Schema, RLS and the game functions
+│   │   ├── 0001_online_multiplayer.sql   # Schema, RLS and the game functions
+│   │   └── 0002_online_moves_user_index.sql # Index for the move log FK
 │   └── tests/
 │       ├── harness.ts             # Local PostgreSQL harness (PGlite + shim)
 │       ├── online_multiplayer.test.ts    # Database security tests
 │       ├── online_multiplayer_sql.test.ts# Runs the SQL editor script
-│       └── online_multiplayer.sql        # Paste-into-the-SQL-editor script
+│       ├── online_multiplayer.sql        # Paste-into-the-SQL-editor script
+│       └── verify_hosted.sql            # Hosted database verification query
 └── src/
     ├── main.tsx                   # React entry point
     ├── App.tsx                    # Application shell and state wiring
@@ -690,6 +738,7 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     │   └── usePersistentState.ts  # De-duplicated localStorage persistence
     ├── online/
     │   ├── config.ts              # Environment validation
+    │   ├── database.types.ts      # GENERATED from the live schema
     │   ├── onlineApi.ts           # Typed wrappers around the RPC functions
     │   ├── roomCode.ts            # Room codes and invite links
     │   ├── supabase.ts            # Lazily loaded Supabase client
@@ -699,6 +748,7 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     │   └── index.css              # Tailwind import, design tokens, motion
     ├── test/
     │   ├── fakeSupabase.ts        # Controllable fake Supabase client
+    │   ├── secrets.test.ts        # Guard: no key or password ever committed
     │   └── setup.ts               # Vitest / Testing Library setup
     └── utils/
         ├── clipboard.ts           # Clipboard and Web Share with fallbacks
