@@ -179,6 +179,7 @@ connection string.
 | --- | --- |
 | **Supabase CLI** | Migrations (`db push`), type generation (`gen types`), SQL queries. |
 | **Supabase MCP server** | Lets an AI agent query the database, apply migrations and read advisors. Add it to `~/.config/opencode/opencode.json`, then run `opencode mcp auth supabase`. |
+| **Playwright MCP** | Gives an AI agent a real browser: navigate, click by accessible name, snapshot, screenshot. Far better than a screenshot-only workflow. `npm i -g @playwright/mcp@latest`, then add it to the same config file. |
 | **Supabase Agent Skills** | Guidance for agents working with Supabase. Installed in `.agents/skills/` and pinned in `skills-lock.json`. |
 | **PGlite** | A real PostgreSQL engine in WASM. The database security tests run the **actual migration** against it, so no Docker and no hosted project are needed. |
 

@@ -660,13 +660,15 @@ the recorded migration count. It exits non-zero on any mismatch.
 
 ## 15. Installed Agent Skills (and when NOT to use them)
 
-`.agents/skills/` contains three skills installed from the official Supabase repositories:
+`.agents/skills/` contains four skills installed from the official Supabase repositories
+(plus one local design skill):
 
 | Skill | Applies here? |
 | --- | --- |
 | `supabase` | ✅ Yes — general Supabase guidance (auth, RLS, Realtime, migrations, debugging). |
 | `supabase-postgres-best-practices` | ✅ Yes — load it **before** changing anything in `supabase/migrations/`. It already caught a real RLS-bypass vulnerability (trap 21). |
 | `supabase-server` | ❌ **No.** It covers `@supabase/server`, Edge Functions, Hono apps and inbound-auth middleware. **This project has no server.** The backend is entirely PostgreSQL (RPC functions + Row Level Security) and the frontend is a static SPA. Do **not** add `supabase/functions/`, `@supabase/server`, `SUPABASE_SECRET_KEY` or `SUPABASE_JWKS_URL` to this repository unless the user explicitly asks for an edge function. |
+| `frontend-design` | ✅ Yes, when working on the visual design. Useful for keeping the UI intentional rather than templated. It does **not** change the architecture. |
 
 **The one legitimate use case for an edge function** would be a CAPTCHA-gated room-creation
 proxy for a public deployment (the database rate limit cannot verify a CAPTCHA). That is
@@ -681,24 +683,44 @@ machine setting, not project configuration):
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "supabase": {
-      "type": "remote",
-      "url": "https://mcp.supabase.com/mcp?project_ref=<ref>&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching",
-      "enabled": true
+    "servers": {
+      "supabase": {
+        "type": "remote",
+        "url": "https://mcp.supabase.com/mcp?project_ref=<ref>&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching",
+        "enabled": true
+      },
+      "playwright": {
+        "type": "local",
+        "command": ["node", "<npm root -g>/@playwright/mcp/cli.js"],
+        "enabled": true,
+        "timeout": { "startup": 120000 }
+      }
     }
   }
 }
 ```
 
-Authenticate once with `opencode mcp auth supabase` (a browser OAuth flow).
+Authenticate the Supabase one once with `opencode mcp auth supabase` (a browser OAuth flow).
+The Playwright server needs no auth but **must be installed globally**
+(`npm i -g @playwright/mcp@latest`) rather than run through `npx -y`, because npx's
+install cache is unreliable on Windows (`ENOTEMPTY` while removing `playwright-core/lib`).
 
-It gives an agent `execute_sql`, `apply_migration`, `list_tables`, `list_migrations`,
-`get_advisors`, `generate_typescript_types`, `get_publishable_keys` and `search_docs`. Useful for
-inspecting the hosted project and for running the verification queries.
+**What each gives an agent:**
 
-> The `account` feature exposes the project and its keys but **not** the GoTrue provider config,
-> so the MCP server cannot enable anonymous sign-ins either. That toggle is a dashboard action
-> (or `npm run setup:anonymous` with a personal access token).
+- *Supabase*: `execute_sql`, `apply_migration`, `list_tables`, `list_migrations`,
+  `get_advisors`, `generate_typescript_types`, `get_publishable_keys`, `search_docs`.
+  Useful for inspecting the hosted project and running the verification queries.
+  > The `account` feature exposes the project and its keys but **not** the GoTrue provider
+  > config, so the MCP server cannot enable anonymous sign-ins either. That toggle is a
+  > dashboard action (or `npm run setup:anonymous` with a personal access token).
+- *Playwright*: a real browser - `browser_navigate`, `browser_click`, `browser_snapshot`,
+  `browser_find`, `browser_take_screenshot`, `browser_resize`, `browser_evaluate` and more.
+  This is the **better** tool for the visual QA in §16: it gives accessibility refs, so you
+  can drive the app by role and name instead of by CSS selector.
+  > Playwright's actionability check is strict: our mode selector is a visually hidden
+  > `<input class="sr-only">` inside a `<label>`, so clicking the *input* times out
+  > ("`<span>Online</span>` intercepts pointer events"). Click the **label text** instead
+  > (`target: "e102"`), or select the radio with the keyboard.
 
 ---
 
