@@ -121,7 +121,7 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="panel relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] p-5 sm:p-6 animate-result-in"
+        className="panel panel-raised relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] p-5 sm:p-6 animate-result-in"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -129,7 +129,7 @@ export function Dialog({
               {title}
             </h2>
             {description && !hideDescription ? (
-              <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-mist-400">
+              <p id={descriptionId} className="mt-1 text-[13px] leading-relaxed text-mist-400">
                 {description}
               </p>
             ) : null}
@@ -143,7 +143,7 @@ export function Dialog({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 p-1.5 text-mist-400 transition-colors hover:border-ink-600 hover:text-mist-100"
+            className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 p-2 text-mist-400 transition-colors duration-150 hover:border-ink-600 hover:text-mist-100"
           >
             <X className="size-4" aria-hidden="true" />
           </button>

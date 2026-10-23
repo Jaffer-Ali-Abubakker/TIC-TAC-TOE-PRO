@@ -19,6 +19,8 @@ interface ResultInfo {
   icon: typeof Crown
   accent: string
   ring: string
+  /** Drives the outcome glow. */
+  result: 'win' | 'draw' | 'loss' | 'neutral'
 }
 
 export function GameResult({
@@ -41,6 +43,7 @@ export function GameResult({
           icon: Sparkles,
           accent: 'text-glow-emerald',
           ring: 'border-glow-emerald/50 bg-glow-emerald/10',
+          result: 'win',
         }
       : {
           title: 'Opponent wins',
@@ -48,6 +51,7 @@ export function GameResult({
           icon: Crown,
           accent: 'text-glow-rose',
           ring: 'border-glow-rose/45 bg-glow-rose/10',
+          result: 'loss',
         }
   } else if (status === 'won' && winner !== null) {
     if (mode === 'pvc') {
@@ -59,6 +63,7 @@ export function GameResult({
             icon: Sparkles,
             accent: 'text-glow-emerald',
             ring: 'border-glow-emerald/50 bg-glow-emerald/10',
+            result: 'win',
           }
         : {
             title: 'Computer wins',
@@ -66,6 +71,7 @@ export function GameResult({
             icon: Crown,
             accent: 'text-glow-rose',
             ring: 'border-glow-rose/45 bg-glow-rose/10',
+            result: 'loss',
           }
     } else {
       info =
@@ -76,6 +82,7 @@ export function GameResult({
               icon: Crown,
               accent: 'text-glow-cyan',
               ring: 'border-glow-cyan/50 bg-glow-cyan/10',
+              result: 'win',
             }
           : {
               title: 'Player 2 wins',
@@ -83,6 +90,7 @@ export function GameResult({
               icon: Handshake,
               accent: 'text-glow-violet',
               ring: 'border-glow-violet/50 bg-glow-violet/10',
+              result: 'win',
             }
     }
   } else if (status === 'draw') {
@@ -92,6 +100,7 @@ export function GameResult({
       icon: Medal,
       accent: 'text-glow-amber',
       ring: 'border-glow-amber/45 bg-glow-amber/10',
+      result: 'draw',
     }
   } else if (endedWithoutWinner) {
     info = {
@@ -100,6 +109,7 @@ export function GameResult({
       icon: Handshake,
       accent: 'text-mist-300',
       ring: 'border-ink-700 bg-ink-900/60',
+      result: 'neutral',
     }
   } else {
     info = {
@@ -108,6 +118,7 @@ export function GameResult({
       icon: User,
       accent: 'text-mist-300',
       ring: 'border-ink-700 bg-ink-900/60',
+      result: 'neutral',
     }
   }
 
@@ -118,14 +129,15 @@ export function GameResult({
       role="status"
       aria-live="polite"
       data-testid="game-result"
-      className={`flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-4 py-3 transition-colors duration-200 ${info.ring} ${
+      data-result={info.result}
+      className={`result-banner flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-4 py-3 ${info.ring} ${
         status === 'playing' ? '' : 'animate-result-in'
       }`}
     >
       <Icon className={`size-5 shrink-0 ${info.accent}`} aria-hidden="true" />
       <div className="min-w-0">
         <p className="text-sm font-semibold text-mist-100">{info.title}</p>
-        <p className="text-xs leading-relaxed text-mist-400">{info.detail}</p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-mist-400">{info.detail}</p>
       </div>
     </div>
   )

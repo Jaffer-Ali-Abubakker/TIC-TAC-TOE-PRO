@@ -20,7 +20,7 @@ export function Toggle({ label, description, checked, onChange, disabled = false
           {label}
         </span>
         {description ? (
-          <span id={descriptionId} className="mt-0.5 block text-xs leading-relaxed text-mist-500">
+          <span id={descriptionId} className="mt-0.5 block text-[13px] leading-relaxed text-mist-500">
             {description}
           </span>
         ) : null}

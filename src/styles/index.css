@@ -4,19 +4,23 @@
  * Tic-Tac-Toe Pro - design tokens
  * ------------------------------------------------------------------ */
 @theme {
-  --color-ink-950: #04060d;
-  --color-ink-900: #080c18;
-  --color-ink-850: #0b1121;
-  --color-ink-800: #101829;
-  --color-ink-750: #16203a;
-  --color-ink-700: #1d294a;
-  --color-ink-600: #29365c;
+  /* Deep blue-black arena ramp: page base -> raised surface. */
+  --color-ink-950: #05070f;
+  --color-ink-900: #080d1b;
+  --color-ink-850: #0b1223;
+  --color-ink-800: #111a2e;
+  --color-ink-750: #16223c;
+  --color-ink-700: #1d2b4b;
+  --color-ink-600: #27395f;
 
-  --color-mist-500: #7e8ba6;
-  --color-mist-400: #98a4bd;
-  --color-mist-300: #b9c3d8;
-  --color-mist-100: #e9eefa;
+  /* Text ramp on the arena base. All of it clears 4.5:1 on ink-800. */
+  --color-mist-500: #8b98b5;
+  --color-mist-400: #a5b1ca;
+  --color-mist-300: #c3ccdf;
+  --color-mist-200: #d7deee;
+  --color-mist-100: #eef2fb;
 
+  /* Identity: X is cyan, O is violet. Everything else is a state. */
   --color-glow-cyan: #22d3ee;
   --color-glow-cyan-deep: #0e7490;
   --color-glow-violet: #a78bfa;
@@ -30,9 +34,10 @@
     'Noto Sans', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  --radius-card: 1.125rem;
+  --radius-card: 1.25rem;
 
-  --shadow-panel: 0 24px 60px -32px rgb(0 0 0 / 0.9);
+  --shadow-panel: 0 24px 56px -34px rgb(2 4 10 / 0.92);
+  --shadow-raised: 0 34px 80px -40px rgb(2 4 10 / 0.95);
 }
 
 /* ------------------------------------------------------------------ *
@@ -70,6 +75,11 @@
     font: inherit;
     color: inherit;
   }
+
+  ::selection {
+    background: rgb(34 211 238 / 0.28);
+    color: var(--color-mist-100);
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -82,107 +92,353 @@
   overflow-x: hidden;
 }
 
+/* The arena: a cyan key light over a violet fill, plus a low horizon. */
 .app-shell::before {
   content: '';
   position: fixed;
-  inset: -30% -10% auto -10%;
-  height: 70vh;
+  inset: -20% -12% auto -12%;
+  height: 86vh;
   z-index: -2;
   background:
-    radial-gradient(45% 55% at 22% 18%, rgb(34 211 238 / 0.16) 0%, transparent 65%),
-    radial-gradient(45% 55% at 78% 8%, rgb(167 139 250 / 0.16) 0%, transparent 65%);
+    radial-gradient(42% 46% at 26% 10%, rgb(34 211 238 / 0.22) 0%, transparent 68%),
+    radial-gradient(40% 44% at 74% 4%, rgb(167 139 250 / 0.2) 0%, transparent 68%),
+    radial-gradient(64% 52% at 50% 30%, rgb(14 116 144 / 0.16) 0%, transparent 74%);
   pointer-events: none;
 }
 
 .app-shell::after {
   content: '';
   position: fixed;
-  inset: auto -10% -20% -10%;
-  height: 60vh;
+  inset: auto -12% -24% -12%;
+  height: 62vh;
   z-index: -2;
-  background: radial-gradient(50% 60% at 50% 100%, rgb(109 40 217 / 0.14) 0%, transparent 70%);
+  background: radial-gradient(52% 60% at 50% 100%, rgb(109 40 217 / 0.18) 0%, transparent 72%);
   pointer-events: none;
 }
 
+/* A faint graph-paper plane that fades out towards the fold. */
 .grid-texture {
   background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.028) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.028) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 100%);
+    linear-gradient(to right, rgb(148 197 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 197 255 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 88%);
 }
 
 /* ------------------------------------------------------------------ *
- * Components
+ * Surfaces
  * ------------------------------------------------------------------ */
+
+/* Section level: a soft vertical gradient, one hairline above the fill. */
 .panel {
-  background: linear-gradient(160deg, rgb(22 32 58 / 0.72) 0%, rgb(8 12 24 / 0.86) 100%);
-  border: 1px solid rgb(29 41 74 / 0.9);
+  position: relative;
+  background: linear-gradient(180deg, rgb(23 35 62 / 0.8) 0%, rgb(8 13 27 / 0.88) 100%);
+  border: 1px solid rgb(45 66 110 / 0.72);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    var(--shadow-panel);
+  backdrop-filter: blur(12px);
 }
 
+/* Form level: recessed, so it reads as a well rather than a card. */
 .panel-inset {
-  background: rgb(4 6 13 / 0.55);
-  border: 1px solid rgb(29 41 74 / 0.8);
+  background: linear-gradient(180deg, rgb(5 8 17 / 0.72) 0%, rgb(10 16 30 / 0.46) 100%);
+  border: 1px solid rgb(39 57 95 / 0.85);
   border-radius: 0.875rem;
+  box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.4);
+}
+
+/* Board level: the highest layer on the page, with its own halo. */
+.panel-raised {
+  background: linear-gradient(180deg, rgb(14 22 42 / 0.94) 0%, rgb(5 8 16 / 0.96) 100%);
+  border: 1px solid rgb(52 78 130 / 0.72);
+  border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    var(--shadow-raised),
+    0 0 130px -40px rgb(34 211 238 / 0.4),
+    0 0 200px -90px rgb(167 139 250 / 0.5);
 }
 
 .brand-mark {
-  background:
-    linear-gradient(140deg, var(--color-glow-cyan) 0%, var(--color-glow-violet) 100%);
-  box-shadow: 0 8px 24px -10px rgb(34 211 238 / 0.7);
+  background: linear-gradient(140deg, var(--color-glow-cyan) 0%, var(--color-glow-violet) 100%);
+  box-shadow:
+    0 10px 26px -12px rgb(34 211 238 / 0.65),
+    inset 0 1px 0 rgb(255 255 255 / 0.3);
 }
 
-.cell-button {
-  background: linear-gradient(165deg, rgb(22 32 58 / 0.9) 0%, rgb(9 14 27 / 0.92) 100%);
-  border: 1px solid rgb(29 41 74 / 0.95);
+/* ------------------------------------------------------------------ *
+ * Type helpers
+ * ------------------------------------------------------------------ */
+
+/* Small tracked uppercase label for a section heading. */
+.micro-label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mist-500);
+}
+
+/* Secondary body copy. 13px, comfortable line height, AA on the arena. */
+.helper-text {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: var(--color-mist-500);
+}
+
+/* ------------------------------------------------------------------ *
+ * Buttons
+ * ------------------------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  white-space: nowrap;
   transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    background-color 140ms ease;
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out,
+    border-color 180ms ease-out,
+    background-color 180ms ease-out,
+    color 180ms ease-out,
+    filter 180ms ease-out;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* The single gradient action of a screen. */
+.btn-primary {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-glow-cyan) 0%,
+    var(--color-glow-violet) 100%
+  );
+  color: #05070f;
+  font-weight: 600;
+  box-shadow: 0 14px 34px -18px rgb(34 211 238 / 0.75);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px -16px rgb(34 211 238 / 0.85);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:focus-visible {
+  outline-color: var(--color-mist-100);
+}
+
+/* The bordered action. */
+.btn-secondary {
+  border: 1px solid rgb(45 66 110 / 0.95);
+  background: rgb(11 18 35 / 0.85);
+  color: var(--color-mist-200);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: rgb(34 211 238 / 0.55);
+  color: var(--color-mist-100);
+  box-shadow: 0 12px 30px -20px rgb(34 211 238 / 0.7);
+}
+
+/* The quiet action. */
+.btn-ghost {
+  color: var(--color-mist-400);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-mist-100);
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+/* The quiet action that leaves. */
+.btn-ghost-danger {
+  color: var(--color-mist-400);
+}
+
+.btn-ghost-danger:hover:not(:disabled) {
+  color: var(--color-glow-rose);
+  background-color: rgb(251 113 133 / 0.1);
+}
+
+/* A destructive confirmation. */
+.btn-danger {
+  background-color: rgb(244 63 94 / 0.9);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: rgb(244 63 94);
+}
+
+/* ------------------------------------------------------------------ *
+ * Board
+ * ------------------------------------------------------------------ */
+.cell-button {
+  background: linear-gradient(168deg, rgb(32 48 82 / 0.96) 0%, rgb(12 19 36 / 0.96) 100%);
+  border: 1px solid rgb(56 82 132 / 0.9);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.11),
+    inset 0 -14px 24px -18px rgb(0 0 0 / 0.9),
+    0 14px 30px -22px rgb(0 0 0 / 0.9);
+  transition:
+    transform 180ms ease-out,
+    border-color 180ms ease-out,
+    box-shadow 180ms ease-out;
 }
 
 .cell-button[aria-disabled='false']:hover {
-  border-color: rgb(34 211 238 / 0.55);
-  box-shadow: 0 10px 30px -16px rgb(34 211 238 / 0.7);
-  transform: translateY(-2px);
+  border-color: rgb(34 211 238 / 0.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 18px 40px -22px rgb(34 211 238 / 0.55),
+    0 0 28px -10px rgb(34 211 238 / 0.4);
+  transform: translateY(-3px);
 }
 
 .cell-button[aria-disabled='false']:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(-1px) scale(0.985);
 }
 
 .cell-button[data-state='occupied'] {
-  background: linear-gradient(165deg, rgb(16 24 41 / 0.95) 0%, rgb(6 9 18 / 0.95) 100%);
-  border-color: rgb(41 54 92 / 0.9);
+  background: linear-gradient(168deg, rgb(20 31 56 / 0.96) 0%, rgb(9 14 28 / 0.96) 100%);
+  border-color: rgb(45 66 110 / 0.9);
 }
 
 .cell-button[data-state='winning'] {
+  background: linear-gradient(168deg, rgb(16 61 52 / 0.9) 0%, rgb(6 24 21 / 0.95) 100%);
   border-color: rgb(52 211 153 / 0.75);
-  background: linear-gradient(165deg, rgb(16 60 52 / 0.85) 0%, rgb(6 22 20 / 0.95) 100%);
   box-shadow:
-    0 0 0 1px rgb(52 211 153 / 0.4),
-    0 12px 40px -18px rgb(52 211 153 / 0.85);
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 0 34px -8px rgb(52 211 153 / 0.75);
+}
+
+/* The mark carries its own light. */
+.glow-cyan {
+  filter: drop-shadow(0 0 7px rgb(34 211 238 / 0.6)) drop-shadow(0 0 18px rgb(34 211 238 / 0.35));
+}
+
+.glow-violet {
+  filter: drop-shadow(0 0 7px rgb(167 139 250 / 0.6))
+    drop-shadow(0 0 18px rgb(167 139 250 / 0.35));
+}
+
+/* ------------------------------------------------------------------ *
+ * Turn banner and score cards
+ * ------------------------------------------------------------------ */
+.turn-banner {
+  background: linear-gradient(180deg, rgb(19 30 55 / 0.85) 0%, rgb(8 13 27 / 0.7) 100%);
+  border: 1px solid rgb(45 66 110 / 0.8);
+  border-radius: 0.875rem;
+  transition:
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out;
+}
+
+.turn-banner[data-accent='cyan'] {
+  border-color: rgb(34 211 238 / 0.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 0 26px -8px rgb(34 211 238 / 0.55);
+}
+
+.turn-banner[data-accent='violet'] {
+  border-color: rgb(167 139 250 / 0.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 0 26px -8px rgb(167 139 250 / 0.55);
+}
+
+.score-card {
+  background: linear-gradient(180deg, rgb(12 19 36 / 0.8) 0%, rgb(6 10 20 / 0.72) 100%);
+  border: 1px solid rgb(39 57 95 / 0.8);
+  border-radius: 0.875rem;
+  transition:
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out,
+    background-color 220ms ease-out;
+}
+
+.score-card[data-active='true'][data-accent='cyan'] {
+  border-color: rgb(34 211 238 / 0.55);
+  background: linear-gradient(180deg, rgb(34 211 238 / 0.14) 0%, rgb(6 10 20 / 0.75) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 0 28px -10px rgb(34 211 238 / 0.6);
+}
+
+.score-card[data-active='true'][data-accent='violet'] {
+  border-color: rgb(167 139 250 / 0.55);
+  background: linear-gradient(180deg, rgb(167 139 250 / 0.14) 0%, rgb(6 10 20 / 0.75) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 0 28px -10px rgb(167 139 250 / 0.6);
+}
+
+/* The result banner carries the colour of the outcome. */
+.result-banner {
+  transition:
+    border-color 200ms ease-out,
+    box-shadow 200ms ease-out;
+}
+
+.result-banner[data-result='win'] {
+  box-shadow: 0 0 32px -12px rgb(52 211 153 / 0.7);
+}
+
+.result-banner[data-result='draw'] {
+  box-shadow: 0 0 32px -12px rgb(251 191 36 / 0.6);
+}
+
+.result-banner[data-result='loss'] {
+  box-shadow: 0 0 32px -12px rgb(251 113 133 / 0.6);
+}
+
+/* ------------------------------------------------------------------ *
+ * Online surfaces
+ * ------------------------------------------------------------------ */
+.waiting-card {
+  animation: arena-wait 2400ms ease-in-out infinite;
+}
+
+.live-dot {
+  animation: live-dot 2000ms ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ *
+ * Segmented control
+ * ------------------------------------------------------------------ */
+.segmented-option {
+  transition:
+    border-color 180ms ease-out,
+    background-color 180ms ease-out,
+    color 180ms ease-out,
+    box-shadow 180ms ease-out;
 }
 
 .segmented-option[data-selected='true'] {
   background: linear-gradient(140deg, rgb(34 211 238 / 0.2) 0%, rgb(167 139 250 / 0.2) 100%);
   border-color: rgb(34 211 238 / 0.55);
   color: var(--color-mist-100);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
-}
-
-.segmented-option:has(input:focus-visible) {
-  outline: 2px solid var(--color-glow-cyan);
-  outline-offset: 2px;
-}
-
-.segmented-option:has(input:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 20px -10px rgb(34 211 238 / 0.7);
 }
 
 /* ------------------------------------------------------------------ *
@@ -191,11 +447,11 @@
 @keyframes symbol-pop {
   0% {
     opacity: 0;
-    transform: scale(0.55) rotate(-12deg);
+    transform: scale(0.4) rotate(-14deg);
   }
-  60% {
+  55% {
     opacity: 1;
-    transform: scale(1.08) rotate(3deg);
+    transform: scale(1.14) rotate(4deg);
   }
   100% {
     opacity: 1;
@@ -236,8 +492,34 @@
   }
 }
 
+/* The waiting room breathes while it waits. */
+@keyframes arena-wait {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+/* The Live indicator keeps its own small heartbeat. */
+@keyframes live-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
+}
+
 .animate-symbol-pop {
-  animation: symbol-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: symbol-pop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .animate-win-pulse {

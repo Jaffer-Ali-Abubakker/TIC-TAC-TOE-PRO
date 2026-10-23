@@ -65,27 +65,19 @@ export function GameControls({
 
       {mode !== 'online' ? (
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={onRestart}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-700 bg-ink-850/80 px-4 py-2.5 text-sm font-medium text-mist-200 transition-colors hover:border-ink-600 hover:bg-ink-800 hover:text-mist-100"
-          >
+          <button type="button" onClick={onRestart} className="btn btn-secondary w-full">
             <RotateCcw className="size-4" aria-hidden="true" />
             Restart round
           </button>
-          <button
-            type="button"
-            onClick={onNewMatch}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-glow-cyan/90 to-glow-violet/90 px-4 py-2.5 text-sm font-semibold text-ink-950 transition-[filter] hover:brightness-110"
-          >
+          <button type="button" onClick={onNewMatch} className="btn btn-primary w-full">
             <Trophy className="size-4" aria-hidden="true" />
             New match
           </button>
         </div>
       ) : null}
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-mist-500">
-        <Gauge className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+      <p className="mt-4 flex items-start gap-2 text-[12px] leading-relaxed text-mist-500">
+        <Gauge className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
           {mode === 'pvc'
             ? 'Hard difficulty uses minimax search and can never lose against an optimal opponent.'

@@ -17,6 +17,8 @@ interface TurnInfo {
   hint: string
   icon: typeof User
   accent: string
+  /** Drives the banner glow. Mirrors the accent, never the logic. */
+  accentKey: 'cyan' | 'violet' | 'neutral'
 }
 
 export function TurnIndicator({
@@ -36,6 +38,7 @@ export function TurnIndicator({
         hint: 'Share the room code to start the match',
         icon: User,
         accent: 'text-mist-300',
+        accentKey: 'neutral',
       }
     } else if (mySymbol !== null && currentPlayer === mySymbol) {
       info = {
@@ -43,6 +46,7 @@ export function TurnIndicator({
         hint: 'Place your symbol',
         icon: User,
         accent: 'text-glow-cyan',
+        accentKey: 'cyan',
       }
     } else {
       info = {
@@ -50,6 +54,7 @@ export function TurnIndicator({
         hint: 'Waiting for your opponent to move',
         icon: Bot,
         accent: 'text-glow-violet',
+        accentKey: 'violet',
       }
     }
   } else if (mode === 'pvp') {
@@ -60,12 +65,14 @@ export function TurnIndicator({
             hint: 'Player 1, place an X',
             icon: User,
             accent: 'text-glow-cyan',
+            accentKey: 'cyan',
           }
         : {
             label: 'Player 2 (O) to move',
             hint: 'Player 2, place an O',
             icon: User,
             accent: 'text-glow-violet',
+            accentKey: 'violet',
           }
   } else if (currentPlayer === humanSymbol) {
     info = {
@@ -73,6 +80,7 @@ export function TurnIndicator({
       hint: 'Place your symbol',
       icon: User,
       accent: 'text-glow-cyan',
+      accentKey: 'cyan',
     }
   } else {
     info = {
@@ -80,6 +88,7 @@ export function TurnIndicator({
       hint: 'The computer is thinking',
       icon: Bot,
       accent: 'text-glow-violet',
+      accentKey: 'violet',
     }
   }
 
@@ -89,7 +98,8 @@ export function TurnIndicator({
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center justify-center gap-2.5 rounded-xl border border-ink-700/80 bg-ink-900/60 px-4 py-2.5"
+      data-accent={info.accentKey}
+      className="turn-banner flex items-center justify-center gap-2.5 px-4 py-3"
     >
       {mode === 'pvp' || mode === 'online' ? (
         <Users className={`size-4 ${info.accent}`} aria-hidden="true" />

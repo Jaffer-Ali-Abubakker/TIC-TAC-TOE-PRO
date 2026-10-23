@@ -122,25 +122,21 @@ export function ScoreBoard({
             <div
               key={tile.key}
               data-testid={`score-${tile.key}`}
-              className={`rounded-xl border px-2 py-3 text-center transition-colors duration-150 ${
-                isActive
-                  ? 'border-glow-cyan/50 bg-glow-cyan/10'
-                  : 'border-ink-700/80 bg-ink-900/60'
-              }`}
+              data-active={isActive}
+              data-accent={tile.symbol === 'O' ? 'violet' : 'cyan'}
+              className="score-card px-2 py-3 text-center"
             >
               <Icon className={`mx-auto size-4 ${tile.accent}`} aria-hidden="true" />
               <p className="mt-1.5 text-2xl font-semibold tabular-nums text-mist-100">
                 {tile.value}
               </p>
-              <p className="mt-0.5 truncate text-[11px] font-medium uppercase tracking-wider text-mist-500">
-                {tile.label}
-              </p>
+              <p className="mt-1 truncate text-[12px] font-medium text-mist-400">{tile.label}</p>
             </div>
           )
         })}
       </div>
 
-      <p className="mt-3 flex items-center justify-between text-[11px] tabular-nums text-mist-500">
+      <p className="mt-3 flex items-center justify-between text-[12px] tabular-nums text-mist-500">
         <span>
           Round <span className="font-semibold text-mist-300">{roundNumber}</span>
         </span>

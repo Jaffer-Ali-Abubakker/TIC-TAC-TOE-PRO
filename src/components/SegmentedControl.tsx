@@ -36,9 +36,7 @@ export function SegmentedControl<T extends string>({
   return (
     <fieldset className={className} disabled={disabled}>
       {showLabel ? (
-        <legend className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-mist-500">
-          {label}
-        </legend>
+        <legend className="micro-label mb-2">{label}</legend>
       ) : null}
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
@@ -46,7 +44,7 @@ export function SegmentedControl<T extends string>({
           return (
             <label
               key={option.value}
-              className="segmented-option inline-flex flex-1 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-ink-700 bg-ink-850/80 px-3 py-2 text-sm font-medium text-mist-400 transition-colors duration-150 hover:border-ink-600 hover:text-mist-200"
+              className="segmented-option inline-flex flex-1 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-ink-700 bg-ink-850/80 px-3 py-2 text-sm font-medium text-mist-300 hover:border-ink-600 hover:text-mist-100"
               data-selected={selected}
               title={option.hint}
             >

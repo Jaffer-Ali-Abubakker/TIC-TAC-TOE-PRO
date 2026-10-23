@@ -347,7 +347,7 @@ export default function App() {
       (state.mode === 'pvp' || state.currentPlayer === state.humanSymbol)
 
   const boardPanel = (
-    <section className="panel p-3 sm:p-5" aria-label="Game">
+    <section className="panel panel-raised p-4 sm:p-6" aria-label="Game">
       <TurnIndicator
         mode={state.mode}
         currentPlayer={state.currentPlayer}
@@ -357,7 +357,7 @@ export default function App() {
         waitingForOpponent={waitingForOpponent}
       />
 
-      <div className="my-4 sm:my-5">
+      <div className="my-6 sm:my-8">
         <GameBoard
           board={state.board}
           winningCombination={state.winningCombination}
@@ -392,8 +392,8 @@ export default function App() {
           onOpenSettings={() => setSettingsOpen(true)}
         />
 
-        <div className="grid flex-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <main className="flex flex-col gap-4">
+        <div className="grid flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <main className={`flex min-w-0 flex-col gap-4${isOnline ? ' justify-center' : ''}`}>
             {!isOnline ? (
               <ScoreBoard
                 mode={state.mode}
@@ -485,13 +485,13 @@ export default function App() {
             </GameControls>
           </main>
 
-          <aside className="flex flex-col gap-4">
+          <aside className={`flex min-w-0 flex-col gap-4${isOnline ? ' justify-center' : ''}`}>
             <MatchStats mode={state.mode} stats={state.stats} />
             <MatchHistory history={state.history} mode={state.mode} />
           </aside>
         </div>
 
-        <footer className="mt-2 text-center text-[11px] leading-relaxed text-mist-500">
+        <footer className="mt-2 text-center text-[12px] leading-relaxed text-mist-500">
           Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move
           across the board.
         </footer>

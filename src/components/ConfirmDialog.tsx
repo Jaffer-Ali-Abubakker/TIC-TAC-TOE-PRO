@@ -40,25 +40,17 @@ export function ConfirmDialog({
         >
           <TriangleAlert className="size-4" aria-hidden="true" />
         </span>
-        <p className="text-sm leading-relaxed text-mist-300">{description}</p>
+        <p className="text-[13px] leading-relaxed text-mist-300">{description}</p>
       </div>
 
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-xl border border-ink-700 bg-ink-850 px-4 py-2.5 text-sm font-medium text-mist-300 transition-colors hover:border-ink-600 hover:text-mist-100"
-        >
+        <button type="button" onClick={onCancel} className="btn btn-secondary">
           {cancelLabel}
         </button>
         <button
           type="button"
           onClick={onConfirm}
-          className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-            destructive
-              ? 'bg-rose-500/90 text-white hover:bg-rose-500'
-              : 'bg-gradient-to-r from-glow-cyan to-glow-violet text-ink-950 hover:brightness-110'
-          }`}
+          className={`btn ${destructive ? 'btn-danger' : 'btn-primary'}`}
         >
           {confirmLabel}
         </button>

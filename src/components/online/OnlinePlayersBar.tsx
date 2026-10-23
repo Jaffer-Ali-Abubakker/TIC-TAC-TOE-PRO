@@ -11,12 +11,31 @@ export interface OnlinePlayersBarProps {
   roundNumber: number
 }
 
-const CONNECTION_COPY: Record<OnlineConnectionStatus, { label: string; tone: string }> = {
-  offline: { label: 'Offline', tone: 'text-mist-500' },
-  connecting: { label: 'Connecting...', tone: 'text-glow-amber' },
-  connected: { label: 'Live', tone: 'text-glow-emerald' },
-  reconnecting: { label: 'Reconnecting...', tone: 'text-glow-amber' },
-  failed: { label: 'Sync limited - retrying', tone: 'text-glow-rose' },
+const CONNECTION_COPY: Record<
+  OnlineConnectionStatus,
+  { label: string; tone: string; pill: string }
+> = {
+  offline: { label: 'Offline', tone: 'text-mist-400', pill: 'border-ink-600 bg-ink-850' },
+  connecting: {
+    label: 'Connecting...',
+    tone: 'text-glow-amber',
+    pill: 'border-glow-amber/40 bg-glow-amber/10',
+  },
+  connected: {
+    label: 'Live',
+    tone: 'text-glow-emerald',
+    pill: 'border-glow-emerald/45 bg-glow-emerald/10',
+  },
+  reconnecting: {
+    label: 'Reconnecting...',
+    tone: 'text-glow-amber',
+    pill: 'border-glow-amber/40 bg-glow-amber/10',
+  },
+  failed: {
+    label: 'Sync limited - retrying',
+    tone: 'text-glow-rose',
+    pill: 'border-glow-rose/40 bg-glow-rose/10',
+  },
 }
 
 function displayName(player: OnlinePlayer): string {
@@ -54,7 +73,7 @@ export function OnlinePlayersBar({
           return (
             <div
               key={player.userId}
-              className="flex items-center gap-3 rounded-xl border border-ink-700/80 bg-ink-900/60 px-3 py-2.5"
+              className="panel-inset flex items-center gap-3 px-3 py-2"
             >
               <span
                 className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
@@ -67,23 +86,23 @@ export function OnlinePlayersBar({
                 {player.symbol}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium text-mist-100">
                     {displayName(player)}
                   </span>
                   {isMe ? (
-                    <span className="shrink-0 rounded bg-ink-750 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-mist-400">
+                    <span className="shrink-0 rounded bg-ink-750 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-mist-300">
                       You
                     </span>
                   ) : null}
                 </span>
-                <span className="block truncate text-[11px] text-mist-500">
+                <span className="mt-0.5 block truncate text-[12px] text-mist-500">
                   {isMe ? `You play ${player.symbol}` : `Opponent plays ${player.symbol}`}
                 </span>
               </span>
               {isOpponent ? (
                 <span
-                  className="shrink-0 text-[11px] font-medium"
+                  className="shrink-0 text-[12px] font-medium"
                   title={
                     opponentPresent === null
                       ? 'Presence is not available for this room'
@@ -93,11 +112,14 @@ export function OnlinePlayersBar({
                   }
                 >
                   {opponentPresent === null ? (
-                    <Circle className="size-3 text-mist-600" aria-hidden="true" />
+                    <Circle className="size-3.5 text-mist-600" aria-hidden="true" />
                   ) : opponentPresent ? (
-                    <Circle className="size-3 fill-glow-emerald text-glow-emerald" aria-hidden="true" />
+                    <Circle
+                      className="size-3.5 fill-glow-emerald text-glow-emerald"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <Circle className="size-3 fill-mist-600 text-mist-600" aria-hidden="true" />
+                    <Circle className="size-3.5 fill-mist-600 text-mist-600" aria-hidden="true" />
                   )}
                   <span className="sr-only">
                     {opponentPresent === null
@@ -113,7 +135,7 @@ export function OnlinePlayersBar({
         })}
       </div>
 
-      <p className="mt-2.5 flex items-center justify-between gap-2 text-[11px]">
+      <p className="mt-3 flex items-center justify-between gap-2 text-[12px]">
         <span className="text-mist-500">
           Round {roundNumber}
           {mySymbol ? ` - you play ${mySymbol}` : ''}
@@ -121,8 +143,12 @@ export function OnlinePlayersBar({
         <span
           role="status"
           aria-live="polite"
-          className={`inline-flex items-center gap-1.5 font-medium ${connectionCopy.tone}`}
+          data-connection={connection}
+          className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[12px] font-semibold ${connectionCopy.pill} ${connectionCopy.tone}`}
         >
+          {connection === 'connected' ? (
+            <span className="live-dot size-2 rounded-full bg-glow-emerald" aria-hidden="true" />
+          ) : null}
           <ConnectionIcon
             className={`size-3.5 ${
               connection === 'connecting' || connection === 'reconnecting' ? 'animate-spin' : ''

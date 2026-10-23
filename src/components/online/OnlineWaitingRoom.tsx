@@ -52,45 +52,33 @@ export function OnlineWaitingRoom({
   }
 
   return (
-    <section className="panel p-4 sm:p-6" aria-label="Waiting for opponent">
+    <section className="panel mx-auto w-full max-w-xl p-4 sm:p-6" aria-label="Waiting for opponent">
       <div className="flex flex-col items-center text-center">
-        <span className="flex size-11 items-center justify-center rounded-2xl border border-glow-cyan/40 bg-glow-cyan/10">
+        <span className="waiting-card flex size-12 items-center justify-center rounded-2xl border border-glow-cyan/40 bg-glow-cyan/10 shadow-[0_0_28px_-8px_rgb(34_211_238_/_0.6)]">
           <UserPlus className="size-5 text-glow-cyan" aria-hidden="true" />
         </span>
-        <h2 className="mt-3 text-base font-semibold text-mist-100">Waiting for your opponent</h2>
-        <p className="mt-1 max-w-sm text-sm leading-relaxed text-mist-400">
+        <h2 className="mt-4 text-lg font-semibold tracking-tight text-mist-100">
+          Waiting for your opponent
+        </h2>
+        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mist-400">
           Share the room code or the invite link. The match starts as soon as a second player
           joins.
         </p>
 
-        <p className="mt-5 rounded-2xl border border-ink-700 bg-ink-950/70 px-6 py-3 font-mono text-3xl tracking-[0.3em] text-mist-100">
+        <p className="mt-6 rounded-2xl border border-ink-600 bg-ink-950/70 px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-mist-100 shadow-[0_0_32px_-10px_rgb(34_211_238_/_0.55)] sm:px-6 sm:text-3xl sm:tracking-[0.3em]">
           {formatted}
         </p>
 
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopyCode}
-            className="inline-flex items-center gap-2 rounded-xl border border-ink-600 bg-ink-850 px-3.5 py-2 text-sm font-medium text-mist-200 transition-colors hover:border-glow-cyan/50 hover:text-mist-100"
-          >
-            <Copy className="size-4" aria-hidden="true" />
-            Copy code
-          </button>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            disabled={!inviteLink}
-            className="inline-flex items-center gap-2 rounded-xl border border-ink-600 bg-ink-850 px-3.5 py-2 text-sm font-medium text-mist-200 transition-colors hover:border-glow-cyan/50 hover:text-mist-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button type="button" onClick={handleCopyLink} disabled={!inviteLink} className="btn btn-primary">
             <Link2 className="size-4" aria-hidden="true" />
             Copy invite link
           </button>
-          <button
-            type="button"
-            onClick={handleShare}
-            disabled={!inviteLink}
-            className="inline-flex items-center gap-2 rounded-xl border border-ink-600 bg-ink-850 px-3.5 py-2 text-sm font-medium text-mist-200 transition-colors hover:border-glow-cyan/50 hover:text-mist-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <button type="button" onClick={handleCopyCode} className="btn btn-secondary">
+            <Copy className="size-4" aria-hidden="true" />
+            Copy code
+          </button>
+          <button type="button" onClick={handleShare} disabled={!inviteLink} className="btn btn-ghost">
             <Share2 className="size-4" aria-hidden="true" />
             Share
           </button>
@@ -99,13 +87,13 @@ export function OnlineWaitingRoom({
         {notice ? (
           <p
             role="status"
-            className={`mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${
+            className={`mt-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] ${
               notice.tone === 'ok'
                 ? 'bg-glow-emerald/15 text-glow-emerald'
                 : 'bg-glow-rose/15 text-glow-rose'
             }`}
           >
-            {notice.tone === 'ok' ? <Check className="size-3.5" aria-hidden="true" /> : null}
+            {notice.tone === 'ok' ? <Check className="size-4" aria-hidden="true" /> : null}
             {notice.message}
           </p>
         ) : null}
@@ -115,7 +103,7 @@ export function OnlineWaitingRoom({
             type="button"
             onClick={onLeave}
             disabled={busy}
-            className="inline-flex items-center gap-2 rounded-xl border border-ink-700 bg-ink-850/80 px-4 py-2.5 text-sm font-medium text-mist-300 transition-colors hover:border-glow-rose/50 hover:text-glow-rose disabled:opacity-60"
+            className="btn btn-ghost-danger"
           >
             <LogOut className="size-4" aria-hidden="true" />
             Leave room

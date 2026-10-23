@@ -53,10 +53,10 @@ export function MatchStats({ mode, stats }: MatchStatsProps) {
   ]
 
   return (
-    <section className="panel p-4" aria-label="Match statistics">
+    <section className="panel p-3" aria-label="Match statistics">
       <div className="mb-3 flex items-center gap-2">
         <ChartColumn className="size-4 text-glow-cyan" aria-hidden="true" />
-        <h2 className="text-sm font-semibold tracking-tight text-mist-100">Match statistics</h2>
+        <h2 className="micro-label">Match statistics</h2>
       </div>
 
       <ul className="space-y-2">
@@ -67,26 +67,26 @@ export function MatchStats({ mode, stats }: MatchStatsProps) {
             <li
               key={row.id}
               data-testid={`stats-${row.id}`}
-              className={`rounded-xl border px-3 py-2.5 transition-colors duration-150 ${
-                isActive ? 'border-glow-cyan/40 bg-glow-cyan/5' : 'border-ink-700/70 bg-ink-900/50'
+              className={`rounded-xl border px-3 py-2 transition-colors duration-150 ${
+                isActive
+                  ? 'border-glow-cyan/45 bg-glow-cyan/5'
+                  : 'border-ink-700/70 bg-ink-900/50'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-medium text-mist-200">
-                  <Icon className="size-3.5 text-mist-500" aria-hidden="true" />
-                  {row.title}
+                <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-mist-200">
+                  <Icon className="size-4 shrink-0 text-mist-500" aria-hidden="true" />
+                  <span className="truncate">{row.title}</span>
                 </span>
-                <span className="text-[11px] tabular-nums text-mist-500">
+                <span className="shrink-0 text-[12px] tabular-nums text-mist-500">
                   {row.rounds} {row.rounds === 1 ? 'round' : 'rounds'}
                 </span>
               </div>
               <dl className="mt-2 grid grid-cols-3 gap-2">
                 {row.entries.map((entry) => (
                   <div key={entry.label}>
-                    <dt className="truncate text-[10px] uppercase tracking-wider text-mist-500">
-                      {entry.label}
-                    </dt>
-                    <dd className="text-sm font-semibold tabular-nums text-mist-100">
+                    <dt className="truncate text-[12px] text-mist-500">{entry.label}</dt>
+                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-mist-100">
                       {entry.value}
                     </dd>
                   </div>
@@ -97,8 +97,8 @@ export function MatchStats({ mode, stats }: MatchStatsProps) {
         })}
       </ul>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-mist-500">
-        <Medal className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+      <p className="mt-3 flex items-start gap-2 text-[12px] leading-relaxed text-mist-500">
+        <Medal className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
           Wins, draws and completed rounds are tracked separately for each mode, so switching modes
           never mixes the records.

@@ -54,16 +54,14 @@ export function GameCell({
     >
       {value === 'X' ? (
         <X
-          className={`size-[52%] text-glow-cyan drop-shadow-[0_0_12px_rgba(34,211,238,0.45)] ${
-            isLastMove ? 'animate-symbol-pop' : ''
-          }`}
+          className={`glow-cyan size-[52%] text-glow-cyan ${isLastMove ? 'animate-symbol-pop' : ''}`}
           strokeWidth={2.75}
           aria-hidden="true"
         />
       ) : null}
       {value === 'O' ? (
         <Circle
-          className={`size-[46%] text-glow-violet drop-shadow-[0_0_12px_rgba(167,139,250,0.45)] ${
+          className={`glow-violet size-[46%] text-glow-violet ${
             isLastMove ? 'animate-symbol-pop' : ''
           }`}
           strokeWidth={2.75}
