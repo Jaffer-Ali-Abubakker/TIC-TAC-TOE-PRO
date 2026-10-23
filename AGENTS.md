@@ -475,28 +475,44 @@ regression.
 Tokens are defined once, in `src/styles/index.css`, inside the Tailwind v4 `@theme` block.
 
 ```
-Surfaces   --color-ink-950 #04060d … --color-ink-600 #29365c
-Text       --color-mist-500 … --color-mist-100 #e9eefa
-Accents    --color-glow-cyan #22d3ee   (primary / X)
-           --color-glow-violet #a78bfa (secondary / O)
-           --color-glow-emerald #34d399 (win)  --color-glow-amber #fbbf24 (draw)
-           --color-glow-rose #fb7185 (loss)
-Radii      --radius-card 1.125rem
+Surfaces   --color-ink-950 #f7f3ea  (warm paper body background)
+           --color-ink-900 #ffffff  (white paper card surfaces)
+           --color-ink-700 #1a1a1e  (near-black ink: text, borders, cell lines)
+Text       --color-mist-500 #3a3a3e … --color-mist-100 #e9e9eb
+Accents    --color-glow-cyan #2563eb   (pen blue / X)
+           --color-glow-violet #dc2626 (marker red / O)
+           --color-glow-emerald #059669 (win)  --color-glow-amber #d97706 (draw)
+           --color-glow-rose #e11d48 (loss)
+Radii      --radius-card 0.75rem
+Shadow     --shadow-panel / --shadow-raised: 4px 4px 0 #1a1a1e (hard offset, flat)
 Font       --font-sans: system stack (NO web font is downloaded)
 ```
 
 Reusable CSS classes defined by hand in the same file: `.panel`, `.panel-inset`, `.brand-mark`,
-`.cell-button`, `.segmented-option`, `.app-shell`, `.grid-texture`.
+`.cell-button`, `.segmented-option`, `.app-shell`, `.grid-texture`, `.main-container`,
+`.board-stage`, `.side-rail`, `.board-grid`, `.micro-label`, `.helper-text`, `.btn`,
+`.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.turn-banner`,
+`.score-card`, `.result-banner`, `.waiting-card`, `.live-dot`.
 
-Motion keyframes: `symbol-pop` (260 ms), `win-pulse` (1.5 s loop), `result-in` (220 ms),
-`think-pulse` (1.1 s loop) — all neutralised by a `prefers-reduced-motion: reduce` block.
+Motion keyframes: `symbol-pop` (220 ms overshoot), `win-pulse` (1.5 s loop), `result-in` (220 ms),
+`think-pulse` (1.1 s loop), `live-dot` (2 s heartbeat) — all neutralised by a
+`prefers-reduced-motion: reduce` block.
 
 Layout rules that must be preserved:
 
-- Mobile-first, board is `max-w-[min(92vw,26rem)] md:max-w-[min(92vw,30rem)]` — always square cells.
 - `body` and `.app-shell` both have `overflow-x: hidden`.
-- Desktop uses `lg:grid-cols-[minmax(0,1fr)_20rem]` — the board stays the primary focus.
-- Bottom padding uses `pb-[max(1rem,env(safe-area-inset-bottom))]`.
+- Default (phones, short windows): stacked, normally scrolling layout.
+- Viewport-fit (`@media (min-width: 1024px) and (min-height: 600px)`):
+  - `.app-shell` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
+  - Header is one compact bar (~56-64px): brand left, game-mode switcher middle,
+    sound/settings buttons right.
+  - `.main-container` is `flex: 1`, `min-height: 0`, two columns: board stage
+    (`minmax(0, 1fr)`) and side rail (~19rem).
+  - `.board-stage` scrolls internally (`overflow-y: auto`); `.side-rail` scrolls internally
+    (`overflow-y: auto`); the page never scrolls.
+  - Board grid: `width: min(26rem, 100%, 54dvh)`, cells keep `aspect-ratio: 1`.
+- Online and waiting-room cards are centred in the stage column; they scroll internally
+  when the window is too short.
 - Dialogs: `max-h-[calc(100dvh-1.5rem)] overflow-y-auto`.
 
 ---
@@ -878,6 +894,24 @@ the expected version.
 - Deployed to Vercel and verified a **live two-player match** with two independent Chrome
   profiles over the DevTools Protocol (see §16). Both boards converged and the database recorded
   the room, both seats and both moves.
+
+**Phase 4 — visual redesign (Notebook theme)**
+
+- Flipped `@theme` tokens to a warm-paper palette: ink-950 `#f7f3ea` paper background,
+  white paper card surfaces, near-black ink-700 text/borders; pen blue X, marker red O,
+  emerald win, amber draw, rose loss. Flat colour only — no gradients, glow, blur.
+- Replaced `.panel`/`.panel-inset`/`.panel-raised` with white ink-bordered cards and
+  `4px 4px 0` hard offset shadows; restyled `.grid-texture` as light grid lines.
+- Viewport-fit layout: `@media (min-width: 1024px) and (min-height: 600px)` makes
+  `.app-shell` a `100dvh` column flex with `overflow: hidden`; header is a compact bar
+  with the mode switcher moved inside; two-column main with internally scrolling side rail;
+  board sized `min(26rem, 100%, 54dvh)` with `aspect-ratio: 1` cells. Below breakpoints,
+  the stacked scrolling layout is preserved.
+- Press-physics button system (flat colour blocks, 2px ink border, hard shadow,
+  hover-lift, press-down) with one primary per screen.
+- Press-physics buttons and notebook cell styling (paper squares, ink borders, mark pop
+  overshoot).
+- Updated §11 design-system docs and this changelog entry.
 
 ---
 

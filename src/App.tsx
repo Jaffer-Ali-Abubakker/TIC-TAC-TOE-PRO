@@ -390,10 +390,11 @@ export default function App() {
           soundEnabled={state.soundEnabled}
           onToggleSound={() => handleSoundChange(!state.soundEnabled)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onModeChange={handleModeChange}
         />
 
-        <div className="grid flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <main className={`flex min-w-0 flex-col gap-4${isOnline ? ' justify-center' : ''}`}>
+        <div className="main-container">
+          <main className="board-stage">
             {!isOnline ? (
               <ScoreBoard
                 mode={state.mode}
@@ -454,7 +455,6 @@ export default function App() {
             <GameControls
               mode={state.mode}
               difficulty={state.difficulty}
-              onModeChange={handleModeChange}
               onDifficultyChange={handleDifficultyChange}
               onRestart={handleRestart}
               onNewMatch={handleNewMatch}
@@ -463,21 +463,19 @@ export default function App() {
               onlineConfig.ok &&
               onlineRoomState &&
               onlineStatus !== 'waiting' ? (
-                <div className="mt-4">
-                  <OnlineActions
-                    busy={online.busy}
-                    canRematch={onlineStatus === 'finished'}
-                    iRequestedRematch={online.iRequestedRematch}
-                    opponentRequestedRematch={online.opponentRequestedRematch}
-                    onRequestRematch={() => void online.requestRematch()}
-                    onLeave={() => void online.leaveRoom()}
-                  />
-                </div>
+                <OnlineActions
+                  busy={online.busy}
+                  canRematch={onlineStatus === 'finished'}
+                  iRequestedRematch={online.iRequestedRematch}
+                  opponentRequestedRematch={online.opponentRequestedRematch}
+                  onRequestRematch={() => void online.requestRematch()}
+                  onLeave={() => void online.leaveRoom()}
+                />
               ) : null}
               {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
                 <p
                   role="alert"
-                  className="mt-3 rounded-xl border border-glow-rose/40 bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
+                  className="mt-3 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
                 >
                   {online.error}
                 </p>
@@ -485,13 +483,13 @@ export default function App() {
             </GameControls>
           </main>
 
-          <aside className={`flex min-w-0 flex-col gap-4${isOnline ? ' justify-center' : ''}`}>
+          <aside className="side-rail">
             <MatchStats mode={state.mode} stats={state.stats} />
             <MatchHistory history={state.history} mode={state.mode} />
           </aside>
         </div>
 
-        <footer className="mt-2 text-center text-[12px] leading-relaxed text-mist-500">
+        <footer className="mt-4 text-center text-[13px] leading-relaxed text-mist-500">
           Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move
           across the board.
         </footer>

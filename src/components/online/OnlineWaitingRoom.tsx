@@ -52,20 +52,20 @@ export function OnlineWaitingRoom({
   }
 
   return (
-    <section className="panel mx-auto w-full max-w-xl p-4 sm:p-6" aria-label="Waiting for opponent">
+    <section className="panel p-4 sm:p-6" aria-label="Waiting for opponent">
       <div className="flex flex-col items-center text-center">
-        <span className="waiting-card flex size-12 items-center justify-center rounded-2xl border border-glow-cyan/40 bg-glow-cyan/10 shadow-[0_0_28px_-8px_rgb(34_211_238_/_0.6)]">
+        <span className="waiting-card flex size-12 items-center justify-center rounded-sm border border-glow-cyan bg-white shadow-panel">
           <UserPlus className="size-5 text-glow-cyan" aria-hidden="true" />
         </span>
-        <h2 className="mt-4 text-lg font-semibold tracking-tight text-mist-100">
+        <h2 className="mt-4 text-lg font-bold tracking-tight text-ink-700">
           Waiting for your opponent
         </h2>
-        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mist-400">
+        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mist-500">
           Share the room code or the invite link. The match starts as soon as a second player
           joins.
         </p>
 
-        <p className="mt-6 rounded-2xl border border-ink-600 bg-ink-950/70 px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-mist-100 shadow-[0_0_32px_-10px_rgb(34_211_238_/_0.55)] sm:px-6 sm:text-3xl sm:tracking-[0.3em]">
+        <p className="mt-6 rounded-sm border-2 border-ink-700 bg-white px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-ink-700 sm:text-3xl sm:tracking-[0.3em]">
           {formatted}
         </p>
 
@@ -87,10 +87,10 @@ export function OnlineWaitingRoom({
         {notice ? (
           <p
             role="status"
-            className={`mt-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] ${
+            className={`mt-4 inline-flex items-center gap-2 rounded-sm px-3 py-2 text-[13px] ${
               notice.tone === 'ok'
-                ? 'bg-glow-emerald/15 text-glow-emerald'
-                : 'bg-glow-rose/15 text-glow-rose'
+                ? 'bg-glow-emerald/10 text-glow-emerald border border-glow-emerald'
+                : 'bg-glow-rose/10 text-glow-rose border border-glow-rose'
             }`}
           >
             {notice.tone === 'ok' ? <Check className="size-4" aria-hidden="true" /> : null}
@@ -98,7 +98,7 @@ export function OnlineWaitingRoom({
           </p>
         ) : null}
 
-        <div className="mt-6 w-full border-t border-ink-700/70 pt-4">
+        <div className="mt-6 w-full border-t-2 border-t-ink-700 pt-4">
           <button
             type="button"
             onClick={onLeave}

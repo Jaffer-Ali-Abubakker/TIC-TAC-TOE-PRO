@@ -39,14 +39,14 @@ export function OnlineLobby({
   }
 
   return (
-    <section className="panel mx-auto w-full max-w-xl p-4 sm:p-6" aria-label="Online multiplayer lobby">
-      <div className="mb-4 flex items-center gap-2">
-        <Users className="size-4 text-glow-cyan" aria-hidden="true" />
+    <section className="panel p-4 sm:p-6" aria-label="Online multiplayer lobby">
+      <div className="mb-4 flex items-center gap-3">
+        <Users className="size-5 text-glow-cyan" aria-hidden="true" />
         <h2 className="micro-label">Online multiplayer</h2>
       </div>
 
       <div className="panel-inset p-3">
-        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-mist-200">
+        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-mist-500">
           Your name (optional)
         </label>
         <div className="mt-2 flex items-center gap-2">
@@ -58,7 +58,7 @@ export function OnlineLobby({
             maxLength={24}
             placeholder="Player"
             onChange={(event) => onDisplayNameChange(event.target.value)}
-            className="w-0 min-w-0 flex-1 rounded-lg border border-ink-700 bg-ink-950/60 px-3 py-2 text-sm text-mist-100 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+            className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
           />
         </div>
         <p className="helper-text mt-2">
@@ -67,12 +67,12 @@ export function OnlineLobby({
       </div>
 
       {inviteCode ? (
-        <div className="mt-4 rounded-xl border border-glow-cyan/45 bg-glow-cyan/10 p-3">
+        <div className="mt-4 rounded-xl border-2 border-glow-cyan bg-glow-cyan/10 p-3">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-glow-cyan">
             <Link2 className="size-4" aria-hidden="true" />
             You were invited to a room
           </p>
-          <p className="mt-1 font-mono text-lg tracking-widest text-mist-100">
+          <p className="mt-1 font-mono text-lg tracking-widest text-ink-700">
             {formatRoomCode(inviteCode)}
           </p>
           <button
@@ -99,7 +99,7 @@ export function OnlineLobby({
         </button>
 
         <div className="panel-inset p-3">
-          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-mist-200">
+          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-mist-500">
             Join with a room code
           </label>
           <div className="mt-2 flex gap-2">
@@ -123,7 +123,7 @@ export function OnlineLobby({
                   submitJoin()
                 }
               }}
-              className="w-0 min-w-0 flex-1 rounded-lg border border-ink-700 bg-ink-950/60 px-3 py-2 font-mono text-sm uppercase tracking-widest text-mist-100 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+              className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 font-mono text-sm uppercase tracking-widest text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
             />
             <button
               type="button"
@@ -149,7 +149,7 @@ export function OnlineLobby({
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-glow-rose/40 bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
+          className="mt-4 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
         >
           {error}
         </p>

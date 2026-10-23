@@ -54,16 +54,14 @@ export function GameCell({
     >
       {value === 'X' ? (
         <X
-          className={`glow-cyan size-[52%] text-glow-cyan ${isLastMove ? 'animate-symbol-pop' : ''}`}
+          className={`mark-x size-[52%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
           strokeWidth={2.75}
           aria-hidden="true"
         />
       ) : null}
       {value === 'O' ? (
         <Circle
-          className={`glow-violet size-[46%] text-glow-violet ${
-            isLastMove ? 'animate-symbol-pop' : ''
-          }`}
+          className={`mark-o size-[46%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
           strokeWidth={2.75}
           aria-hidden="true"
         />
@@ -71,7 +69,7 @@ export function GameCell({
       {isWinning ? (
         <span
           aria-hidden="true"
-          className="animate-win-pulse pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-glow-emerald/60"
+          className="animate-win-pulse pointer-events-none absolute inset-0 rounded-2xl border-2 border-glow-emerald"
         />
       ) : null}
     </button>

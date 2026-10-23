@@ -11,14 +11,14 @@ export interface OnlineSetupNoticeProps {
  */
 export function OnlineSetupNotice({ message, missing }: OnlineSetupNoticeProps) {
   return (
-    <section className="panel mx-auto w-full max-w-xl p-4 sm:p-6" aria-label="Online multiplayer setup">
+    <section className="panel p-4 sm:p-6" aria-label="Online multiplayer setup">
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-glow-amber/15 text-glow-amber">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-glow-amber/10 text-glow-amber border border-glow-amber">
           <CloudOff className="size-4" aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-mist-100">Online multiplayer is not configured</h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-mist-400">{message}</p>
+          <h2 className="text-sm font-bold text-ink-700">Online multiplayer is not configured</h2>
+          <p className="mt-1 text-[13px] leading-relaxed text-mist-500">{message}</p>
         </div>
       </div>
 
@@ -36,8 +36,8 @@ export function OnlineSetupNotice({ message, missing }: OnlineSetupNoticeProps) 
             ))}
           </ul>
           <p className="mt-2 text-[12px] leading-relaxed text-mist-500">
-            Copy <code className="text-mist-300">.env.example</code> to{' '}
-            <code className="text-mist-300">.env</code>, fill in the values and restart the dev
+            Copy <code className="text-ink-700">.env.example</code> to{' '}
+            <code className="text-ink-700">.env</code>, fill in the values and restart the dev
             server. See the README for the full setup.
           </p>
         </div>

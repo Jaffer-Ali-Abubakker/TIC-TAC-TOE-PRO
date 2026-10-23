@@ -63,9 +63,9 @@ export function GameBoard({
       ref={containerRef}
       role="group"
       aria-label="Game board"
-      className="mx-auto w-full max-w-[min(92vw,26rem)] md:max-w-[min(92vw,30rem)]"
+      className="board-grid"
     >
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid gap-2 sm:gap-3">
         {board.map((value, index) => (
           <GameCell
             key={index}

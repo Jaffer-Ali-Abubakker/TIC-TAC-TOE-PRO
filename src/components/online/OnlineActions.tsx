@@ -33,7 +33,7 @@ export function OnlineActions({
           {opponentIsWaiting ? (
             <p className="mt-2 text-sm text-glow-cyan">Your opponent wants to play again.</p>
           ) : iRequestedRematch ? (
-            <p className="mt-2 flex items-center gap-2 text-sm text-mist-300">
+            <p className="mt-2 flex items-center gap-2 text-sm text-mist-500">
               <Check className="size-4 text-glow-emerald" aria-hidden="true" />
               Waiting for your opponent to accept...
             </p>

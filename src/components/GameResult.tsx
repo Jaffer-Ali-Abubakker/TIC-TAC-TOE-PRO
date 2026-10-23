@@ -19,7 +19,7 @@ interface ResultInfo {
   icon: typeof Crown
   accent: string
   ring: string
-  /** Drives the outcome glow. */
+  /** Drives the outcome border. */
   result: 'win' | 'draw' | 'loss' | 'neutral'
 }
 
@@ -42,7 +42,7 @@ export function GameResult({
           detail: 'You completed the line and took the round.',
           icon: Sparkles,
           accent: 'text-glow-emerald',
-          ring: 'border-glow-emerald/50 bg-glow-emerald/10',
+          ring: 'border-2 border-glow-emerald',
           result: 'win',
         }
       : {
@@ -50,7 +50,7 @@ export function GameResult({
           detail: 'Your opponent completed the line and took the round.',
           icon: Crown,
           accent: 'text-glow-rose',
-          ring: 'border-glow-rose/45 bg-glow-rose/10',
+          ring: 'border-2 border-glow-rose',
           result: 'loss',
         }
   } else if (status === 'won' && winner !== null) {
@@ -62,7 +62,7 @@ export function GameResult({
             detail: 'Great play - the computer could not keep up.',
             icon: Sparkles,
             accent: 'text-glow-emerald',
-            ring: 'border-glow-emerald/50 bg-glow-emerald/10',
+            ring: 'border-2 border-glow-emerald',
             result: 'win',
           }
         : {
@@ -70,7 +70,7 @@ export function GameResult({
             detail: 'The computer took this round. Try another difficulty?',
             icon: Crown,
             accent: 'text-glow-rose',
-            ring: 'border-glow-rose/45 bg-glow-rose/10',
+            ring: 'border-2 border-glow-rose',
             result: 'loss',
           }
     } else {
@@ -81,7 +81,7 @@ export function GameResult({
               detail: 'Player 1 completed a line with X.',
               icon: Crown,
               accent: 'text-glow-cyan',
-              ring: 'border-glow-cyan/50 bg-glow-cyan/10',
+              ring: 'border-2 border-glow-cyan',
               result: 'win',
             }
           : {
@@ -89,7 +89,7 @@ export function GameResult({
               detail: 'Player 2 completed a line with O.',
               icon: Handshake,
               accent: 'text-glow-violet',
-              ring: 'border-glow-violet/50 bg-glow-violet/10',
+              ring: 'border-2 border-glow-violet',
               result: 'win',
             }
     }
@@ -99,7 +99,7 @@ export function GameResult({
       detail: 'The board is full and nobody has a line.',
       icon: Medal,
       accent: 'text-glow-amber',
-      ring: 'border-glow-amber/45 bg-glow-amber/10',
+      ring: 'border-2 border-glow-amber',
       result: 'draw',
     }
   } else if (endedWithoutWinner) {
@@ -107,8 +107,8 @@ export function GameResult({
       title: 'Match ended',
       detail: 'The match was ended without a winner. No forfeit win is awarded.',
       icon: Handshake,
-      accent: 'text-mist-300',
-      ring: 'border-ink-700 bg-ink-900/60',
+      accent: 'text-mist-500',
+      ring: 'border-2 border-ink-700',
       result: 'neutral',
     }
   } else {
@@ -116,8 +116,8 @@ export function GameResult({
       title: `Round ${roundNumber}`,
       detail: 'X starts every new round.',
       icon: User,
-      accent: 'text-mist-300',
-      ring: 'border-ink-700 bg-ink-900/60',
+      accent: 'text-mist-500',
+      ring: 'border-2 border-ink-700',
       result: 'neutral',
     }
   }
@@ -136,8 +136,8 @@ export function GameResult({
     >
       <Icon className={`size-5 shrink-0 ${info.accent}`} aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-mist-100">{info.title}</p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-mist-400">{info.detail}</p>
+        <p className="text-sm font-semibold text-ink-700">{info.title}</p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-mist-500">{info.detail}</p>
       </div>
     </div>
   )

@@ -15,26 +15,26 @@ const CONNECTION_COPY: Record<
   OnlineConnectionStatus,
   { label: string; tone: string; pill: string }
 > = {
-  offline: { label: 'Offline', tone: 'text-mist-400', pill: 'border-ink-600 bg-ink-850' },
+  offline: { label: 'Offline', tone: 'text-mist-500', pill: 'border-ink-600 bg-white' },
   connecting: {
     label: 'Connecting...',
     tone: 'text-glow-amber',
-    pill: 'border-glow-amber/40 bg-glow-amber/10',
+    pill: 'border-glow-amber bg-glow-amber/10',
   },
   connected: {
     label: 'Live',
     tone: 'text-glow-emerald',
-    pill: 'border-glow-emerald/45 bg-glow-emerald/10',
+    pill: 'border-glow-emerald bg-glow-emerald/10',
   },
   reconnecting: {
     label: 'Reconnecting...',
     tone: 'text-glow-amber',
-    pill: 'border-glow-amber/40 bg-glow-amber/10',
+    pill: 'border-glow-amber bg-glow-amber/10',
   },
   failed: {
     label: 'Sync limited - retrying',
     tone: 'text-glow-rose',
-    pill: 'border-glow-rose/40 bg-glow-rose/10',
+    pill: 'border-glow-rose bg-glow-rose/10',
   },
 }
 
@@ -76,10 +76,10 @@ export function OnlinePlayersBar({
               className="panel-inset flex items-center gap-3 px-3 py-2"
             >
               <span
-                className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                className={`flex size-8 shrink-0 items-center justify-center rounded-sm text-sm font-bold ${
                   player.symbol === 'X'
-                    ? 'bg-glow-cyan/15 text-glow-cyan'
-                    : 'bg-glow-violet/15 text-glow-violet'
+                    ? 'bg-glow-cyan/10 text-glow-cyan border border-glow-cyan'
+                    : 'bg-glow-violet/10 text-glow-violet border border-glow-violet'
                 }`}
                 aria-hidden="true"
               >
@@ -87,11 +87,11 @@ export function OnlinePlayersBar({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-mist-100">
+                  <span className="truncate text-sm font-medium text-ink-700">
                     {displayName(player)}
                   </span>
                   {isMe ? (
-                    <span className="shrink-0 rounded bg-ink-750 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-mist-300">
+                    <span className="shrink-0 rounded bg-ink-100 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-mist-500">
                       You
                     </span>
                   ) : null}
@@ -135,7 +135,7 @@ export function OnlinePlayersBar({
         })}
       </div>
 
-      <p className="mt-3 flex items-center justify-between gap-2 text-[12px]">
+      <p className="mt-3 flex items-center justify-between gap-2 text-[13px]">
         <span className="text-mist-500">
           Round {roundNumber}
           {mySymbol ? ` - you play ${mySymbol}` : ''}
@@ -144,7 +144,7 @@ export function OnlinePlayersBar({
           role="status"
           aria-live="polite"
           data-connection={connection}
-          className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[12px] font-semibold ${connectionCopy.pill} ${connectionCopy.tone}`}
+          className={`inline-flex items-center gap-2 rounded-sm border px-2 py-1 text-[13px] font-semibold ${connectionCopy.pill} ${connectionCopy.tone}`}
         >
           {connection === 'connected' ? (
             <span className="live-dot size-2 rounded-full bg-glow-emerald" aria-hidden="true" />

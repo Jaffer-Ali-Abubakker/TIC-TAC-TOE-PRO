@@ -46,7 +46,7 @@ export function ScoreBoard({
             symbol: 'X',
             value: stats.pvc.draws,
             icon: Medal,
-            accent: 'text-mist-300',
+            accent: 'text-mist-500',
           },
           {
             key: 'computer',
@@ -73,7 +73,7 @@ export function ScoreBoard({
               symbol: 'X',
               value: stats.online.draws,
               icon: Medal,
-              accent: 'text-mist-300',
+              accent: 'text-mist-500',
             },
             {
               key: 'o',
@@ -99,7 +99,7 @@ export function ScoreBoard({
             symbol: 'X',
             value: stats.pvp.draws,
             icon: Medal,
-            accent: 'text-mist-300',
+            accent: 'text-mist-500',
           },
           {
             key: 'o',
@@ -113,7 +113,7 @@ export function ScoreBoard({
 
   return (
     <section className="panel p-4" aria-label="Current match score">
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         {tiles.map((tile) => {
           const Icon = tile.icon
           const isActive =
@@ -124,21 +124,23 @@ export function ScoreBoard({
               data-testid={`score-${tile.key}`}
               data-active={isActive}
               data-accent={tile.symbol === 'O' ? 'violet' : 'cyan'}
-              className="score-card px-2 py-3 text-center"
+              className="score-card px-3 py-4 text-center"
             >
-              <Icon className={`mx-auto size-4 ${tile.accent}`} aria-hidden="true" />
-              <p className="mt-1.5 text-2xl font-semibold tabular-nums text-mist-100">
+              <Icon className={`mx-auto size-5 ${tile.accent}`} aria-hidden="true" />
+              <p className="mt-2 text-3xl font-bold tabular-nums text-ink-700">
                 {tile.value}
               </p>
-              <p className="mt-1 truncate text-[12px] font-medium text-mist-400">{tile.label}</p>
+              <p className="mt-1 truncate text-[12px] font-medium text-mist-500 uppercase tracking-wider">
+                {tile.label}
+              </p>
             </div>
           )
         })}
       </div>
 
-      <p className="mt-3 flex items-center justify-between text-[12px] tabular-nums text-mist-500">
+      <p className="mt-4 flex items-center justify-between text-[13px] tabular-nums text-mist-500">
         <span>
-          Round <span className="font-semibold text-mist-300">{roundNumber}</span>
+          Round <span className="font-semibold text-ink-700">{roundNumber}</span>
         </span>
         <span>
           {completedRounds} completed {completedRounds === 1 ? 'round' : 'rounds'}

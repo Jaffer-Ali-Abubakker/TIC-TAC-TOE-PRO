@@ -17,7 +17,7 @@ interface TurnInfo {
   hint: string
   icon: typeof User
   accent: string
-  /** Drives the banner glow. Mirrors the accent, never the logic. */
+  /** Drives the banner border. Mirrors the accent, never the logic. */
   accentKey: 'cyan' | 'violet' | 'neutral'
 }
 
@@ -37,7 +37,7 @@ export function TurnIndicator({
         label: 'Waiting for an opponent',
         hint: 'Share the room code to start the match',
         icon: User,
-        accent: 'text-mist-300',
+        accent: 'text-mist-500',
         accentKey: 'neutral',
       }
     } else if (mySymbol !== null && currentPlayer === mySymbol) {
@@ -99,22 +99,22 @@ export function TurnIndicator({
       role="status"
       aria-live="polite"
       data-accent={info.accentKey}
-      className="turn-banner flex items-center justify-center gap-2.5 px-4 py-3"
+      className="turn-banner flex items-center justify-center gap-3 px-4 py-3"
     >
       {mode === 'pvp' || mode === 'online' ? (
-        <Users className={`size-4 ${info.accent}`} aria-hidden="true" />
+        <Users className={`size-5 ${info.accent}`} aria-hidden="true" />
       ) : (
-        <Icon className={`size-4 ${info.accent}`} aria-hidden="true" />
+        <Icon className={`size-5 ${info.accent}`} aria-hidden="true" />
       )}
-      <p className="text-sm font-medium text-mist-100">
+      <p className="text-sm font-medium text-ink-700">
         {info.label}
         <span className="sr-only">. {info.hint}</span>
       </p>
       {isThinking ? (
-        <span className="flex items-center gap-1" aria-hidden="true">
-          <span className="animate-think-pulse size-1.5 rounded-full bg-glow-violet" />
-          <span className="animate-think-pulse size-1.5 rounded-full bg-glow-violet [animation-delay:150ms]" />
-          <span className="animate-think-pulse size-1.5 rounded-full bg-glow-violet [animation-delay:300ms]" />
+        <span className="flex items-center gap-1.5" aria-hidden="true">
+          <span className="animate-think-pulse size-2 rounded-full bg-ink-700" />
+          <span className="animate-think-pulse size-2 rounded-full bg-ink-700 [animation-delay:150ms]" />
+          <span className="animate-think-pulse size-2 rounded-full bg-ink-700 [animation-delay:300ms]" />
         </span>
       ) : null}
     </div>

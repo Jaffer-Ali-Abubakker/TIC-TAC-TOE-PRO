@@ -1,43 +1,44 @@
 @import 'tailwindcss';
 
 /* ------------------------------------------------------------------ *
- * Tic-Tac-Toe Pro - design tokens
+ * Tic-Tac-Toe Pro - design tokens (Notebook theme)
  * ------------------------------------------------------------------ */
 @theme {
-  /* Deep blue-black arena ramp: page base -> raised surface. */
-  --color-ink-950: #05070f;
-  --color-ink-900: #080d1b;
-  --color-ink-850: #0b1223;
-  --color-ink-800: #111a2e;
-  --color-ink-750: #16223c;
-  --color-ink-700: #1d2b4b;
-  --color-ink-600: #27395f;
+  /* Paper palette. ink-950 is the warm paper background; ink-900..750
+     are all white paper for card surfaces; ink-700/600 are the near-black
+     ink used for text, borders and cell lines. */
+  --color-ink-950: #f7f3ea;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #ffffff;
+  --color-ink-800: #ffffff;
+  --color-ink-750: #ffffff;
+  --color-ink-700: #1a1a1e;
+  --color-ink-600: #2a2a2e;
 
-  /* Text ramp on the arena base. All of it clears 4.5:1 on ink-800. */
-  --color-mist-500: #8b98b5;
-  --color-mist-400: #a5b1ca;
-  --color-mist-300: #c3ccdf;
-  --color-mist-200: #d7deee;
-  --color-mist-100: #eef2fb;
+  /* Text on paper: lighter shades of the same ink. */
+  --color-mist-500: #3a3a3e;
+  --color-mist-400: #5a5a5e;
+  --color-mist-300: #8a8a8e;
+  --color-mist-200: #b9b9be;
+  --color-mist-100: #e9e9eb;
 
-  /* Identity: X is cyan, O is violet. Everything else is a state. */
-  --color-glow-cyan: #22d3ee;
-  --color-glow-cyan-deep: #0e7490;
-  --color-glow-violet: #a78bfa;
-  --color-glow-violet-deep: #6d28d9;
-  --color-glow-amber: #fbbf24;
-  --color-glow-rose: #fb7185;
-  --color-glow-emerald: #34d399;
+  /* Player and outcome colours. Token names stay the same; values change. */
+  --color-glow-cyan: #2563eb;   /* pen blue  -> X */
+  --color-glow-violet: #dc2626; /* marker red -> O */
+  --color-glow-emerald: #059669; /* win green */
+  --color-glow-amber: #d97706;   /* draw amber */
+  --color-glow-rose: #e11d48;   /* loss rose */
 
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'Noto Sans', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  --radius-card: 1.25rem;
+  --radius-card: 0.75rem;
 
-  --shadow-panel: 0 24px 56px -34px rgb(2 4 10 / 0.92);
-  --shadow-raised: 0 34px 80px -40px rgb(2 4 10 / 0.95);
+  /* Hard offset shadow: 4px 4px 0 in the ink colour. Flat colour only. */
+  --shadow-panel: 4px 4px 0 #1a1a1e;
+  --shadow-raised: 4px 4px 0 #1a1a1e;
 }
 
 /* ------------------------------------------------------------------ *
@@ -57,7 +58,7 @@
     margin: 0;
     min-height: 100dvh;
     background-color: var(--color-ink-950);
-    color: var(--color-mist-100);
+    color: var(--color-ink-700);
     font-family: var(--font-sans);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'tnum';
     -webkit-font-smoothing: antialiased;
@@ -66,9 +67,9 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-glow-cyan);
+    outline: 2px solid var(--color-ink-700);
     outline-offset: 2px;
-    border-radius: 0.375rem;
+    border-radius: 0.25rem;
   }
 
   button {
@@ -77,14 +78,15 @@
   }
 
   ::selection {
-    background: rgb(34 211 238 / 0.28);
-    color: var(--color-mist-100);
+    background: rgb(37 99 235 / 0.28);
+    color: var(--color-ink-700);
   }
 }
 
 /* ------------------------------------------------------------------ *
- * Ambient background
+ * Shell
  * ------------------------------------------------------------------ */
+/* Default: stacked, normally scrolling layout (phones, short windows). */
 .app-shell {
   position: relative;
   isolation: isolate;
@@ -92,80 +94,117 @@
   overflow-x: hidden;
 }
 
-/* The arena: a cyan key light over a violet fill, plus a low horizon. */
-.app-shell::before {
-  content: '';
-  position: fixed;
-  inset: -20% -12% auto -12%;
-  height: 86vh;
-  z-index: -2;
-  background:
-    radial-gradient(42% 46% at 26% 10%, rgb(34 211 238 / 0.22) 0%, transparent 68%),
-    radial-gradient(40% 44% at 74% 4%, rgb(167 139 250 / 0.2) 0%, transparent 68%),
-    radial-gradient(64% 52% at 50% 30%, rgb(14 116 144 / 0.16) 0%, transparent 74%);
-  pointer-events: none;
+/* Viewport-fit layout: large enough windows fit the whole game on one
+   screen with no page scrolling. */
+@media (min-width: 1024px) and (min-height: 600px) {
+  .app-shell {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 }
 
-.app-shell::after {
-  content: '';
-  position: fixed;
-  inset: auto -12% -24% -12%;
-  height: 62vh;
-  z-index: -2;
-  background: radial-gradient(52% 60% at 50% 100%, rgb(109 40 217 / 0.18) 0%, transparent 72%);
-  pointer-events: none;
+/* Main container: stacked by default, two columns on large viewports. */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
 }
 
-/* A faint graph-paper plane that fades out towards the fold. */
+/* Board stage: score line, turn banner, board, controls. */
+.board-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Side rail: match statistics and recent rounds. */
+.side-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) and (min-height: 600px) {
+  .main-container {
+    flex: 1;
+    min-height: 0;
+    flex-direction: row;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .board-stage {
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    gap: 1rem;
+  }
+
+  .side-rail {
+    width: 19rem;
+    min-width: 0;
+    overflow-y: auto;
+    gap: 1rem;
+  }
+}
+
+/* Board sizing: viewport-sized, square cells. */
+.board-grid {
+  width: min(26rem, 100%, 54dvh);
+  margin: 0 auto;
+}
+
+.board-grid > .grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  aspect-ratio: 1;
+}
+
+/* Faint light grid-line texture on warm paper. */
 .grid-texture {
   background-image:
-    linear-gradient(to right, rgb(148 197 255 / 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(148 197 255 / 0.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(120% 90% at 50% 0%, #000 0%, transparent 88%);
+    linear-gradient(to right, rgb(26 42 30 / 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(26 42 30 / 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(120% 100% at 50% 0%, #000 0%, transparent 92%);
 }
 
 /* ------------------------------------------------------------------ *
  * Surfaces
  * ------------------------------------------------------------------ */
 
-/* Section level: a soft vertical gradient, one hairline above the fill. */
+/* White paper card: 2px ink border, hard offset shadow, generous rounding. */
 .panel {
-  position: relative;
-  background: linear-gradient(180deg, rgb(23 35 62 / 0.8) 0%, rgb(8 13 27 / 0.88) 100%);
-  border: 1px solid rgb(45 66 110 / 0.72);
+  background: #ffffff;
+  border: 2px solid var(--color-ink-700);
   border-radius: var(--radius-card);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    var(--shadow-panel);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-panel);
 }
 
-/* Form level: recessed, so it reads as a well rather than a card. */
+/* Form level: same paper card. */
 .panel-inset {
-  background: linear-gradient(180deg, rgb(5 8 17 / 0.72) 0%, rgb(10 16 30 / 0.46) 100%);
-  border: 1px solid rgb(39 57 95 / 0.85);
-  border-radius: 0.875rem;
-  box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.4);
+  background: #ffffff;
+  border: 2px solid var(--color-ink-700);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
 }
 
-/* Board level: the highest layer on the page, with its own halo. */
+/* Board level: same paper card, highest layer visually. */
 .panel-raised {
-  background: linear-gradient(180deg, rgb(14 22 42 / 0.94) 0%, rgb(5 8 16 / 0.96) 100%);
-  border: 1px solid rgb(52 78 130 / 0.72);
+  background: #ffffff;
+  border: 2px solid var(--color-ink-700);
   border-radius: var(--radius-card);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    var(--shadow-raised),
-    0 0 130px -40px rgb(34 211 238 / 0.4),
-    0 0 200px -90px rgb(167 139 250 / 0.5);
+  box-shadow: var(--shadow-raised);
 }
 
 .brand-mark {
-  background: linear-gradient(140deg, var(--color-glow-cyan) 0%, var(--color-glow-violet) 100%);
-  box-shadow:
-    0 10px 26px -12px rgb(34 211 238 / 0.65),
-    inset 0 1px 0 rgb(255 255 255 / 0.3);
+  border: 2px solid var(--color-ink-700);
+  background: #ffffff;
+  box-shadow: var(--shadow-panel);
 }
 
 /* ------------------------------------------------------------------ *
@@ -182,7 +221,7 @@
   color: var(--color-mist-500);
 }
 
-/* Secondary body copy. 13px, comfortable line height, AA on the arena. */
+/* Secondary body copy on paper. 12-13px, ink colour. */
 .helper-text {
   font-size: 0.8125rem;
   line-height: 1.25rem;
@@ -197,19 +236,20 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   padding: 0.625rem 1rem;
   font-size: 0.875rem;
   line-height: 1.25rem;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
+  border: 2px solid var(--color-ink-700);
+  background: #ffffff;
   transition:
     transform 180ms ease-out,
     box-shadow 180ms ease-out,
     border-color 180ms ease-out,
     background-color 180ms ease-out,
-    color 180ms ease-out,
-    filter 180ms ease-out;
+    color 180ms ease-out;
 }
 
 .btn:disabled {
@@ -217,86 +257,86 @@
   opacity: 0.55;
 }
 
-/* The single gradient action of a screen. */
+/* Strong primary action: flat colour block with ink border. */
 .btn-primary {
-  background-image: linear-gradient(
-    90deg,
-    var(--color-glow-cyan) 0%,
-    var(--color-glow-violet) 100%
-  );
-  color: #05070f;
+  background: var(--color-glow-cyan);
+  color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 14px 34px -18px rgb(34 211 238 / 0.75);
+  box-shadow: var(--shadow-panel);
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.07);
-  transform: translateY(-1px);
-  box-shadow: 0 18px 40px -16px rgb(34 211 238 / 0.85);
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 #1a1a1e;
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
+  box-shadow: 2px 2px 0 #1a1a1e;
 }
 
 .btn-primary:focus-visible {
-  outline-color: var(--color-mist-100);
+  outline-color: var(--color-ink-700);
 }
 
-/* The bordered action. */
+/* Bordered secondary action. */
 .btn-secondary {
-  border: 1px solid rgb(45 66 110 / 0.95);
-  background: rgb(11 18 35 / 0.85);
-  color: var(--color-mist-200);
+  background: #ffffff;
+  color: var(--color-ink-700);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: rgb(34 211 238 / 0.55);
-  color: var(--color-mist-100);
-  box-shadow: 0 12px 30px -20px rgb(34 211 238 / 0.7);
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 #1a1a1e;
 }
 
-/* The quiet action. */
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 #1a1a1e;
+}
+
+/* Quiet tertiary action. */
 .btn-ghost {
-  color: var(--color-mist-400);
+  background: #ffffff;
+  color: var(--color-mist-500);
 }
 
 .btn-ghost:hover:not(:disabled) {
-  color: var(--color-mist-100);
-  background-color: rgb(255 255 255 / 0.05);
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 #1a1a1e;
+  background: #f1ede2;
 }
 
-/* The quiet action that leaves. */
-.btn-ghost-danger {
-  color: var(--color-mist-400);
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 #1a1a1e;
 }
 
-.btn-ghost-danger:hover:not(:disabled) {
-  color: var(--color-glow-rose);
-  background-color: rgb(251 113 133 / 0.1);
-}
-
-/* A destructive confirmation. */
+/* Destructive confirmation. */
 .btn-danger {
-  background-color: rgb(244 63 94 / 0.9);
-  color: #fff;
+  background: var(--color-glow-rose);
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: var(--shadow-panel);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background-color: rgb(244 63 94);
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 #1a1a1e;
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 #1a1a1e;
 }
 
 /* ------------------------------------------------------------------ *
  * Board
  * ------------------------------------------------------------------ */
 .cell-button {
-  background: linear-gradient(168deg, rgb(32 48 82 / 0.96) 0%, rgb(12 19 36 / 0.96) 100%);
-  border: 1px solid rgb(56 82 132 / 0.9);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.11),
-    inset 0 -14px 24px -18px rgb(0 0 0 / 0.9),
-    0 14px 30px -22px rgb(0 0 0 / 0.9);
+  background: #ffffff;
+  border: 2px solid var(--color-ink-700);
+  box-shadow: var(--shadow-panel);
   transition:
     transform 180ms ease-out,
     border-color 180ms ease-out,
@@ -304,71 +344,58 @@
 }
 
 .cell-button[aria-disabled='false']:hover {
-  border-color: rgb(34 211 238 / 0.6);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.16),
-    0 18px 40px -22px rgb(34 211 238 / 0.55),
-    0 0 28px -10px rgb(34 211 238 / 0.4);
-  transform: translateY(-3px);
+  border-color: var(--color-glow-cyan);
+  box-shadow: 6px 6px 0 #1a1a1e;
+  transform: translateY(-2px);
 }
 
 .cell-button[aria-disabled='false']:active {
-  transform: translateY(-1px) scale(0.985);
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 #1a1a1e;
 }
 
 .cell-button[data-state='occupied'] {
-  background: linear-gradient(168deg, rgb(20 31 56 / 0.96) 0%, rgb(9 14 28 / 0.96) 100%);
-  border-color: rgb(45 66 110 / 0.9);
+  border-color: var(--color-ink-600);
 }
 
 .cell-button[data-state='winning'] {
-  background: linear-gradient(168deg, rgb(16 61 52 / 0.9) 0%, rgb(6 24 21 / 0.95) 100%);
-  border-color: rgb(52 211 153 / 0.75);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.1),
-    0 0 34px -8px rgb(52 211 153 / 0.75);
+  border-color: var(--color-glow-emerald);
+  box-shadow: 6px 6px 0 var(--color-glow-emerald);
 }
 
-/* The mark carries its own light. */
-.glow-cyan {
-  filter: drop-shadow(0 0 7px rgb(34 211 238 / 0.6)) drop-shadow(0 0 18px rgb(34 211 238 / 0.35));
+/* Placed marks: pen blue X, marker red O, flat colour. */
+.mark-x {
+  color: var(--color-glow-cyan);
 }
 
-.glow-violet {
-  filter: drop-shadow(0 0 7px rgb(167 139 250 / 0.6))
-    drop-shadow(0 0 18px rgb(167 139 250 / 0.35));
+.mark-o {
+  color: var(--color-glow-violet);
 }
 
 /* ------------------------------------------------------------------ *
  * Turn banner and score cards
  * ------------------------------------------------------------------ */
 .turn-banner {
-  background: linear-gradient(180deg, rgb(19 30 55 / 0.85) 0%, rgb(8 13 27 / 0.7) 100%);
-  border: 1px solid rgb(45 66 110 / 0.8);
-  border-radius: 0.875rem;
+  border: 2px solid var(--color-ink-700);
+  border-radius: var(--radius-card);
   transition:
     border-color 220ms ease-out,
     box-shadow 220ms ease-out;
 }
 
 .turn-banner[data-accent='cyan'] {
-  border-color: rgb(34 211 238 / 0.5);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 26px -8px rgb(34 211 238 / 0.55);
+  border-color: var(--color-glow-cyan);
+  box-shadow: 4px 4px 0 #1a1a1e;
 }
 
 .turn-banner[data-accent='violet'] {
-  border-color: rgb(167 139 250 / 0.5);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 26px -8px rgb(167 139 250 / 0.55);
+  border-color: var(--color-glow-violet);
+  box-shadow: 4px 4px 0 #1a1a1e;
 }
 
 .score-card {
-  background: linear-gradient(180deg, rgb(12 19 36 / 0.8) 0%, rgb(6 10 20 / 0.72) 100%);
-  border: 1px solid rgb(39 57 95 / 0.8);
-  border-radius: 0.875rem;
+  border: 2px solid var(--color-ink-700);
+  border-radius: var(--radius-card);
   transition:
     border-color 220ms ease-out,
     box-shadow 220ms ease-out,
@@ -376,22 +403,18 @@
 }
 
 .score-card[data-active='true'][data-accent='cyan'] {
-  border-color: rgb(34 211 238 / 0.55);
-  background: linear-gradient(180deg, rgb(34 211 238 / 0.14) 0%, rgb(6 10 20 / 0.75) 100%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    0 0 28px -10px rgb(34 211 238 / 0.6);
+  border-color: var(--color-glow-cyan);
+  box-shadow: 4px 4px 0 var(--color-glow-cyan);
+  background: #eef7ff;
 }
 
 .score-card[data-active='true'][data-accent='violet'] {
-  border-color: rgb(167 139 250 / 0.55);
-  background: linear-gradient(180deg, rgb(167 139 250 / 0.14) 0%, rgb(6 10 20 / 0.75) 100%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    0 0 28px -10px rgb(167 139 250 / 0.6);
+  border-color: var(--color-glow-violet);
+  box-shadow: 4px 4px 0 var(--color-glow-violet);
+  background: #fff3f3;
 }
 
-/* The result banner carries the colour of the outcome. */
+/* Result banner carries the outcome colour. */
 .result-banner {
   transition:
     border-color 200ms ease-out,
@@ -399,31 +422,27 @@
 }
 
 .result-banner[data-result='win'] {
-  box-shadow: 0 0 32px -12px rgb(52 211 153 / 0.7);
+  box-shadow: 6px 6px 0 var(--color-glow-emerald);
 }
 
 .result-banner[data-result='draw'] {
-  box-shadow: 0 0 32px -12px rgb(251 191 36 / 0.6);
+  box-shadow: 6px 6px 0 var(--color-glow-amber);
 }
 
 .result-banner[data-result='loss'] {
-  box-shadow: 0 0 32px -12px rgb(251 113 133 / 0.6);
+  box-shadow: 6px 6px 0 var(--color-glow-rose);
 }
 
-/* ------------------------------------------------------------------ *
- * Online surfaces
- * ------------------------------------------------------------------ */
+/* Online surfaces */
 .waiting-card {
-  animation: arena-wait 2400ms ease-in-out infinite;
+  box-shadow: var(--shadow-panel);
 }
 
 .live-dot {
   animation: live-dot 2000ms ease-in-out infinite;
 }
 
-/* ------------------------------------------------------------------ *
- * Segmented control
- * ------------------------------------------------------------------ */
+/* Segmented control */
 .segmented-option {
   transition:
     border-color 180ms ease-out,
@@ -433,12 +452,10 @@
 }
 
 .segmented-option[data-selected='true'] {
-  background: linear-gradient(140deg, rgb(34 211 238 / 0.2) 0%, rgb(167 139 250 / 0.2) 100%);
-  border-color: rgb(34 211 238 / 0.55);
-  color: var(--color-mist-100);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    0 0 20px -10px rgb(34 211 238 / 0.7);
+  background: var(--color-glow-cyan);
+  border-color: var(--color-glow-cyan);
+  color: #ffffff;
+  box-shadow: var(--shadow-panel);
 }
 
 /* ------------------------------------------------------------------ *
@@ -447,11 +464,11 @@
 @keyframes symbol-pop {
   0% {
     opacity: 0;
-    transform: scale(0.4) rotate(-14deg);
+    transform: scale(0.5) rotate(-12deg);
   }
-  55% {
+  60% {
     opacity: 1;
-    transform: scale(1.14) rotate(4deg);
+    transform: scale(1.12) rotate(3deg);
   }
   100% {
     opacity: 1;
@@ -492,19 +509,6 @@
   }
 }
 
-/* The waiting room breathes while it waits. */
-@keyframes arena-wait {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.94);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-}
-
 /* The Live indicator keeps its own small heartbeat. */
 @keyframes live-dot {
   0%,
@@ -519,7 +523,7 @@
 }
 
 .animate-symbol-pop {
-  animation: symbol-pop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: symbol-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .animate-win-pulse {

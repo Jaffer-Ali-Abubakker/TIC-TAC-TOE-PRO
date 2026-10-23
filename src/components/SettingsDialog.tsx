@@ -77,7 +77,7 @@ export function SettingsDialog({
                   },
                 ]}
               />
-              <p className="mt-2 text-[12px] leading-relaxed text-mist-500">
+              <p className="mt-2 text-[13px] leading-relaxed text-mist-500">
                 Changing your symbol starts a fresh round.
               </p>
             </div>
@@ -93,7 +93,7 @@ export function SettingsDialog({
             </div>
           </>
         ) : (
-          <p className="panel-inset p-3 text-[13px] leading-relaxed text-mist-400">
+          <p className="panel-inset p-3 text-[13px] leading-relaxed text-mist-500">
             Symbol and difficulty settings only apply to the player versus computer mode. Switch
             back to that mode to change them.
           </p>
@@ -102,15 +102,15 @@ export function SettingsDialog({
         <div className="panel-inset p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-mist-100">Reset statistics</p>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-mist-500">
+              <p className="text-sm font-medium text-ink-700">Reset statistics</p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-mist-500">
                 Clears all scores and the round history for both modes.
               </p>
             </div>
             <button
               type="button"
               onClick={onResetStats}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-medium text-glow-rose transition-colors duration-150 hover:bg-rose-500/20"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm font-medium text-glow-rose transition-colors duration-150 hover:bg-glow-rose/20"
             >
               <Trash className="size-4" aria-hidden="true" />
               Reset
@@ -119,7 +119,7 @@ export function SettingsDialog({
         </div>
 
         {!storageAvailable ? (
-          <p className="flex items-start gap-2 rounded-xl border border-glow-amber/30 bg-glow-amber/10 p-3 text-[13px] leading-relaxed text-glow-amber">
+          <p className="flex items-start gap-2 rounded-xl border border-glow-amber bg-glow-amber/10 p-3 text-[13px] leading-relaxed text-glow-amber">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
               Local storage is unavailable in this browser, so settings and scores will not be kept

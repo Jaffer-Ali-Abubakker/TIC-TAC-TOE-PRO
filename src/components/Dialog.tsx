@@ -110,7 +110,7 @@ export function Dialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
       <div
-        className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink-950/40"
         aria-hidden="true"
         onClick={onClose}
       />
@@ -121,15 +121,15 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="panel panel-raised relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] p-5 sm:p-6 animate-result-in"
+        className="panel relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] p-5 sm:p-6 animate-result-in"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-mist-100">
+            <h2 id={titleId} className="text-lg font-bold tracking-tight text-ink-700">
               {title}
             </h2>
             {description && !hideDescription ? (
-              <p id={descriptionId} className="mt-1 text-[13px] leading-relaxed text-mist-400">
+              <p id={descriptionId} className="mt-1 text-[13px] leading-relaxed text-mist-500">
                 {description}
               </p>
             ) : null}
@@ -143,7 +143,7 @@ export function Dialog({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 p-2 text-mist-400 transition-colors duration-150 hover:border-ink-600 hover:text-mist-100"
+            className="shrink-0 rounded-lg border border-ink-700 bg-ink-900 p-2 text-ink-700 transition-colors duration-150 hover:bg-ink-600 hover:text-white"
           >
             <X className="size-4" aria-hidden="true" />
           </button>
