@@ -111,41 +111,42 @@ export function ScoreBoard({
           },
         ]
 
+  const isActive = (tile: Tile) =>
+    status === 'playing' && tile.key !== 'draw' && tile.symbol === currentPlayer
+
   return (
-    <section className="panel p-4" aria-label="Current match score">
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+    <section className="panel p-3" aria-label="Current match score">
+      <div className="flex items-center justify-between gap-3">
         {tiles.map((tile) => {
           const Icon = tile.icon
-          const isActive =
-            status === 'playing' && tile.key !== 'draw' && tile.symbol === currentPlayer
+          const active = isActive(tile)
           return (
             <div
               key={tile.key}
               data-testid={`score-${tile.key}`}
-              data-active={isActive}
+              data-active={active}
               data-accent={tile.symbol === 'O' ? 'violet' : 'cyan'}
-              className="score-card px-3 py-4 text-center"
+              className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
+                active
+                  ? tile.symbol === 'O'
+                    ? 'border-glow-violet bg-glow-violet/10'
+                    : 'border-glow-cyan bg-glow-cyan/10'
+                  : 'border-ink-700 bg-white'
+              }`}
             >
-              <Icon className={`mx-auto size-5 ${tile.accent}`} aria-hidden="true" />
-              <p className="mt-2 text-3xl font-bold tabular-nums text-ink-700">
-                {tile.value}
-              </p>
-              <p className="mt-1 truncate text-[12px] font-medium text-mist-500 uppercase tracking-wider">
+              <Icon className={`size-4 ${tile.accent}`} aria-hidden="true" />
+              <span className="text-sm font-semibold text-ink-700">{tile.value}</span>
+              <span className="text-[11px] uppercase tracking-wider text-mist-500">
                 {tile.label}
-              </p>
+              </span>
             </div>
           )
         })}
-      </div>
-
-      <p className="mt-4 flex items-center justify-between text-[13px] tabular-nums text-mist-500">
-        <span>
+        <span className="text-[12px] text-mist-500">
           Round <span className="font-semibold text-ink-700">{roundNumber}</span>
+          {completedRounds > 0 ? ` · ${completedRounds} completed` : null}
         </span>
-        <span>
-          {completedRounds} completed {completedRounds === 1 ? 'round' : 'rounds'}
-        </span>
-      </p>
+      </div>
     </section>
   )
 }

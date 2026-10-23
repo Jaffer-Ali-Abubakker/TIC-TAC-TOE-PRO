@@ -384,17 +384,17 @@ export default function App() {
     <div className="app-shell">
       <div className="grid-texture pointer-events-none fixed inset-0 -z-10" aria-hidden="true" />
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:gap-5 sm:px-5 sm:pt-6">
-        <GameHeader
-          mode={state.mode}
-          soundEnabled={state.soundEnabled}
-          onToggleSound={() => handleSoundChange(!state.soundEnabled)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onModeChange={handleModeChange}
-        />
+      <GameHeader
+        mode={state.mode}
+        soundEnabled={state.soundEnabled}
+        onToggleSound={() => handleSoundChange(!state.soundEnabled)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onModeChange={handleModeChange}
+      />
 
-        <div className="main-container">
-          <main className="board-stage">
+      <div className="shell-body flex flex-col gap-4 px-3">
+        <div className="main-container flex-1 min-h-0 overflow-hidden">
+          <main className="board-stage flex flex-1 min-h-0 overflow-hidden">
             {!isOnline ? (
               <ScoreBoard
                 mode={state.mode}

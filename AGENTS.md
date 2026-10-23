@@ -502,15 +502,20 @@ Layout rules that must be preserved:
 
 - `body` and `.app-shell` both have `overflow-x: hidden`.
 - Default (phones, short windows): stacked, normally scrolling layout.
-- Viewport-fit (`@media (min-width: 1024px) and (min-height: 600px)`):
+- Viewport-fit (`@media (min-width: 1024px) and (min-height: 620px)`):
   - `.app-shell` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
   - Header is one compact bar (~56-64px): brand left, game-mode switcher middle,
     sound/settings buttons right.
-  - `.main-container` is `flex: 1`, `min-height: 0`, two columns: board stage
-    (`minmax(0, 1fr)`) and side rail (~19rem).
-  - `.board-stage` scrolls internally (`overflow-y: auto`); `.side-rail` scrolls internally
-    (`overflow-y: auto`); the page never scrolls.
-  - Board grid: `width: min(26rem, 100%, 54dvh)`, cells keep `aspect-ratio: 1`.
+  - `.shell-body` is `flex: 1`, `min-height: 0`, `overflow: hidden`.
+  - `.main-container` is `flex: 1`, `min-height: 0`, `overflow: hidden`, two columns:
+    board stage (`minmax(0, 1fr)`) and side rail (~19rem).
+  - `.board-stage` is `grid-template-rows: auto auto minmax(0, 1fr) auto` with
+    `overflow-y: hidden` — score row, turn banner, board area (takes all remaining
+    space), controls row. The page never scrolls.
+  - `.side-rail` has `overflow-y: auto` — it is the only element allowed to scroll
+    vertically on desktop.
+  - Board grid: `width: min(100cqw, 100cqh, 26rem)`, cells keep `aspect-ratio: 1`,
+    floor of 20rem (320px). Below 620px height the stacked fallback applies.
 - Online and waiting-room cards are centred in the stage column; they scroll internally
   when the window is too short.
 - Dialogs: `max-h-[calc(100dvh-1.5rem)] overflow-y-auto`.
@@ -902,11 +907,16 @@ the expected version.
   emerald win, amber draw, rose loss. Flat colour only — no gradients, glow, blur.
 - Replaced `.panel`/`.panel-inset`/`.panel-raised` with white ink-bordered cards and
   `4px 4px 0` hard offset shadows; restyled `.grid-texture` as light grid lines.
-- Viewport-fit layout: `@media (min-width: 1024px) and (min-height: 600px)` makes
+- Viewport-fit layout: `@media (min-width: 1024px) and (min-height: 620px)` makes
   `.app-shell` a `100dvh` column flex with `overflow: hidden`; header is a compact bar
-  with the mode switcher moved inside; two-column main with internally scrolling side rail;
-  board sized `min(26rem, 100%, 54dvh)` with `aspect-ratio: 1` cells. Below breakpoints,
-  the stacked scrolling layout is preserved.
+  with the mode switcher moved inside; `.shell-body` is `flex: 1 min-h-0 overflow-hidden`;
+  `.main-container` is `flex-1 min-h-0 overflow-hidden` with two columns (board stage
+  `minmax(0,1fr)` and side rail ~19rem); `.board-stage` uses
+  `grid-template-rows: auto auto minmax(0,1fr)` with `overflow-y: hidden` so score row,
+  turn banner, board and controls all fit on one screen; `.side-rail` scrolls internally.
+  Board grid sizes from available space via `container-type: size` and
+  `width: min(100cqw, 100cqh, 26rem)` with `aspect-ratio: 1` and a 20rem floor.
+  Below breakpoints, the stacked scrolling layout is preserved.
 - Press-physics button system (flat colour blocks, 2px ink border, hard shadow,
   hover-lift, press-down) with one primary per screen.
 - Press-physics buttons and notebook cell styling (paper squares, ink borders, mark pop
