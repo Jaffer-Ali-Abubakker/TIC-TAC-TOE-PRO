@@ -65,6 +65,101 @@
 }
 
 /* ------------------------------------------------------------------ *
+ * Scrollbars - thin arcade rails: transparent track, no OS arrow
+ * buttons, a dim thumb that turns lime -> cyan while the pointer is
+ * inside the scrolling element. Chrome/Edge/Safari use the webkit
+ * pseudo-elements, Firefox the standard properties (they cannot be
+ * mixed: setting scrollbar-width makes Chrome ignore the pseudo-elements).
+ * ------------------------------------------------------------------ */
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(204, 255, 0, 0.18);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(204, 255, 0, 0.6);
+}
+
+/* Kills the native up/down arrow buttons. */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(204, 255, 0, 0.4) transparent;
+  }
+}
+
+/* Inner panel rail: 4px, and it never lets a scroll chain to the page. */
+.arcade-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 0.375rem;
+}
+
+.arcade-scroll::-webkit-scrollbar,
+.board-stage::-webkit-scrollbar,
+.side-rail::-webkit-scrollbar {
+  width: 4px;
+}
+
+.arcade-scroll::-webkit-scrollbar-thumb,
+.board-stage::-webkit-scrollbar-thumb,
+.side-rail::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(204, 255, 0, 0.16);
+}
+
+.arcade-scroll:hover::-webkit-scrollbar-thumb,
+.board-stage:hover::-webkit-scrollbar-thumb,
+.side-rail:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(204, 255, 0, 0.32) 0%, rgba(0, 245, 255, 0.32) 100%);
+}
+
+.arcade-scroll::-webkit-scrollbar-thumb:hover,
+.board-stage::-webkit-scrollbar-thumb:hover,
+.side-rail::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--color-lime) 0%, var(--color-cyan) 100%);
+}
+
+/* Soft fade at both ends of a scrolling list. */
+.scroll-fade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Decorative scene: grid, corner glows, mouse spotlight
  * ------------------------------------------------------------------ */
 .scene {
@@ -186,6 +281,8 @@
   .side-rail {
     min-height: 0;
     overflow-y: auto;
+    padding-right: 0.375rem;
+    overscroll-behavior: contain;
   }
 }
 
@@ -868,6 +965,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {

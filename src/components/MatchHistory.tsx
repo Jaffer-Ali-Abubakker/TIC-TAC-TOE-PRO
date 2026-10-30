@@ -55,7 +55,7 @@ export function MatchHistory({ history, mode }: MatchHistoryProps) {
           </p>
         </div>
       ) : (
-        <ul className="max-h-64 space-y-2 overflow-y-auto pr-0.5">
+        <ul className="arcade-scroll scroll-fade max-h-64 space-y-2">
           {history.map((entry) => {
             const isDraw = entry.result === 'draw'
             const resultLabel = isDraw

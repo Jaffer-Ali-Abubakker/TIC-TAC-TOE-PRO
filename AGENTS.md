@@ -499,7 +499,8 @@ Reusable CSS classes defined by hand in the same file: `.scene`, `.scene-grid`, 
 `.mark-x`, `.mark-o`, `.winning-line`, `.turn-indicator`, `.score-board`, `.score-pill`,
 `.score-number`, `.score-label`, `.micro-label`, `.helper-text`, `.segmented-option`, `.btn`,
 `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-ghost-danger`, `.btn-icon`,
-`.result-banner`, `.result-title`, `.dialog-overlay`, `.dialog-panel`, `.waiting-card`, `.live-dot`.
+`.result-banner`, `.result-title`, `.dialog-overlay`, `.dialog-panel`, `.waiting-card`, `.live-dot`,
+`.arcade-scroll`, `.scroll-fade`.
 
 Motion keyframes: `mark-pop` (the one hero animation: 400 ms overshoot on a placed symbol),
 `win-pulse` (1.5 s loop on the winning cells), `dot-pulse`, `think-pulse`, `result-in`,
@@ -515,6 +516,12 @@ Rules that must be preserved:
   from `WINNING_LINES`. Do not make it a normal grid item: a definite grid placement is resolved
   before auto-placement, so a static line would push the nine cells down one row.
 - `body` and `.app-shell` both have `overflow-x: hidden`.
+- Scrollbars are themed once, globally: 6 px page thumb in lime, 4 px panel thumb
+  (`.arcade-scroll`, plus `.side-rail` / `.board-stage`) that turns lime → cyan while the pointer
+  is inside the scrolling element, transparent track, no OS arrow buttons. `.scroll-fade` adds the
+  top/bottom mask on a scrolling list and nothing else. Do not set `scrollbar-width` outside the
+  Firefox-only `@supports not selector(::-webkit-scrollbar)` block — it makes Chrome ignore the
+  `::-webkit-scrollbar` rules, including the arrow-button kill.
 - Default (phones, short windows): stacked, normally scrolling layout.
 - The header wraps: brand and the sound/settings buttons on the first row, the mode switcher on
   its own full-width row below 640 px (the pills drop their icons there so they stay on one line).
@@ -929,6 +936,9 @@ the expected version.
 - Game controls, scoreboard, statistics, history, dialogs and all five online screens were
   restyled onto the shared `.panel` / `.panel-inset` / `.btn` / `.segmented-option` vocabulary.
   No props, state flow, labels or test ids changed.
+- Replaced the native OS scrollbars with themed ones: 6 px page thumb, 4 px `.arcade-scroll`
+  panel thumb (lime → cyan on hover, transparent track, arrow buttons killed), `overscroll-behavior:
+  contain` on the rails, and a `.scroll-fade` mask on the history list.
 - Updated §11 design-system docs and this changelog entry.
 
 ---
