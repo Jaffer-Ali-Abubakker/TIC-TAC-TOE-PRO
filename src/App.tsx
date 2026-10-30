@@ -329,6 +329,17 @@ export default function App() {
     setPendingConfirm(null)
   }, [])
 
+  // Spotlight follows the pointer. Only on devices with a fine pointer.
+  useEffect(() => {
+    if (!window.matchMedia('(pointer: fine)').matches) return
+    const track = (event: PointerEvent) => {
+      document.body.style.setProperty('--mouse-x', `${event.clientX}px`)
+      document.body.style.setProperty('--mouse-y', `${event.clientY}px`)
+    }
+    window.addEventListener('pointermove', track, { passive: true })
+    return () => window.removeEventListener('pointermove', track)
+  }, [])
+
   /* ---------------------------------------------------------------- *
    * Render
    * ---------------------------------------------------------------- */
@@ -347,7 +358,7 @@ export default function App() {
       (state.mode === 'pvp' || state.currentPlayer === state.humanSymbol)
 
   const boardPanel = (
-    <section className="panel panel-raised p-4 sm:p-6" aria-label="Game">
+    <section className="panel flex flex-col gap-4 p-4 sm:p-6" aria-label="Game">
       <TurnIndicator
         mode={state.mode}
         currentPlayer={state.currentPlayer}
@@ -357,7 +368,7 @@ export default function App() {
         waitingForOpponent={waitingForOpponent}
       />
 
-      <div className="my-6 sm:my-8">
+      <div className="my-2">
         <GameBoard
           board={state.board}
           winningCombination={state.winningCombination}
@@ -382,19 +393,22 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="grid-texture pointer-events-none fixed inset-0 -z-10" aria-hidden="true" />
+      <div className="scene" aria-hidden="true">
+        <span className="scene-grid" />
+        <span className="scene-blob scene-blob--lime" />
+        <span className="scene-blob scene-blob--cyan" />
+      </div>
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:gap-5 sm:px-5 sm:pt-6">
-        <GameHeader
-          mode={state.mode}
-          soundEnabled={state.soundEnabled}
-          onToggleSound={() => handleSoundChange(!state.soundEnabled)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onModeChange={handleModeChange}
-        />
+      <GameHeader
+        mode={state.mode}
+        soundEnabled={state.soundEnabled}
+        onToggleSound={() => handleSoundChange(!state.soundEnabled)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onModeChange={handleModeChange}
+      />
 
-        <div className="main-container">
-          <main className="board-stage">
+      <div className="main-container">
+        <main className="board-stage">
             {!isOnline ? (
               <ScoreBoard
                 mode={state.mode}
@@ -475,7 +489,7 @@ export default function App() {
               {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
                 <p
                   role="alert"
-                  className="mt-3 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
+                  className="mt-3 rounded-xl border border-rose/40 bg-rose/10 px-3 py-2 text-sm text-rose"
                 >
                   {online.error}
                 </p>
@@ -487,13 +501,12 @@ export default function App() {
             <MatchStats mode={state.mode} stats={state.stats} />
             <MatchHistory history={state.history} mode={state.mode} />
           </aside>
-        </div>
-
-        <footer className="mt-4 text-center text-[13px] leading-relaxed text-mist-500">
-          Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move
-          across the board.
-        </footer>
       </div>
+
+      <footer className="shrink-0 border-t border-white/5 px-4 py-3 text-center text-[12px] leading-relaxed text-muted">
+        Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move across
+        the board.
+      </footer>
 
       <SettingsDialog
         open={settingsOpen}

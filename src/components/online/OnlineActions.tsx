@@ -22,7 +22,7 @@ export function OnlineActions({
   const opponentIsWaiting = opponentRequestedRematch && !iRequestedRematch
 
   return (
-    <section className="panel p-4" aria-label="Online actions">
+    <section className="mt-4" aria-label="Online actions">
       {canRematch ? (
         <div className="panel-inset p-3">
           <p className="micro-label flex items-center gap-2">
@@ -31,16 +31,14 @@ export function OnlineActions({
           </p>
 
           {opponentIsWaiting ? (
-            <p className="mt-2 text-sm text-glow-cyan">Your opponent wants to play again.</p>
+            <p className="mt-2 text-sm text-lime">Your opponent wants to play again.</p>
           ) : iRequestedRematch ? (
-            <p className="mt-2 flex items-center gap-2 text-sm text-mist-500">
-              <Check className="size-4 text-glow-emerald" aria-hidden="true" />
+            <p className="mt-2 flex items-center gap-2 text-sm text-muted">
+              <Check className="size-4 text-emerald" aria-hidden="true" />
               Waiting for your opponent to accept...
             </p>
           ) : (
-            <p className="helper-text mt-2">
-              A new round starts once both players ask for it.
-            </p>
+            <p className="helper-text mt-2">A new round starts once both players ask for it.</p>
           )}
 
           <button
@@ -55,7 +53,12 @@ export function OnlineActions({
         </div>
       ) : null}
 
-      <button type="button" onClick={onLeave} disabled={busy} className="btn btn-ghost-danger mt-3 w-full">
+      <button
+        type="button"
+        onClick={onLeave}
+        disabled={busy}
+        className="btn btn-ghost-danger mt-3 w-full"
+      >
         <LogOut className="size-4" aria-hidden="true" />
         Leave room
       </button>

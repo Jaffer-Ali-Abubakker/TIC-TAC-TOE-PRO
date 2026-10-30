@@ -14,10 +14,9 @@ export interface ScoreBoardProps {
 interface Tile {
   key: string
   label: string
-  symbol: Player
+  symbol: Player | null
   value: number
   icon: typeof Crown
-  accent: string
 }
 
 export function ScoreBoard({
@@ -29,121 +28,62 @@ export function ScoreBoard({
   roundNumber,
   completedRounds,
 }: ScoreBoardProps) {
+  const computerSymbol: Player = humanSymbol === 'X' ? 'O' : 'X'
+
   const tiles: Tile[] =
     mode === 'pvc'
       ? [
-          {
-            key: 'player',
-            label: 'You',
-            symbol: humanSymbol,
-            value: stats.pvc.playerWins,
-            icon: User,
-            accent: 'text-glow-cyan',
-          },
-          {
-            key: 'draw',
-            label: 'Draws',
-            symbol: 'X',
-            value: stats.pvc.draws,
-            icon: Medal,
-            accent: 'text-mist-500',
-          },
-          {
-            key: 'computer',
-            label: 'Computer',
-            symbol: humanSymbol === 'X' ? 'O' : 'X',
-            value: stats.pvc.computerWins,
-            icon: Bot,
-            accent: 'text-glow-violet',
-          },
+          { key: 'player', label: 'You', symbol: humanSymbol, value: stats.pvc.playerWins, icon: User },
+          { key: 'draw', label: 'Draws', symbol: null, value: stats.pvc.draws, icon: Medal },
+          { key: 'computer', label: 'Computer', symbol: computerSymbol, value: stats.pvc.computerWins, icon: Bot },
         ]
       : mode === 'online'
         ? [
-            {
-              key: 'x',
-              label: 'Player 1 (X)',
-              symbol: 'X',
-              value: stats.online.xWins,
-              icon: Crown,
-              accent: 'text-glow-cyan',
-            },
-            {
-              key: 'draw',
-              label: 'Draws',
-              symbol: 'X',
-              value: stats.online.draws,
-              icon: Medal,
-              accent: 'text-mist-500',
-            },
-            {
-              key: 'o',
-              label: 'Player 2 (O)',
-              symbol: 'O',
-              value: stats.online.oWins,
-              icon: User,
-              accent: 'text-glow-violet',
-            },
+            { key: 'x', label: 'Player 1 (X)', symbol: 'X', value: stats.online.xWins, icon: Crown },
+            { key: 'draw', label: 'Draws', symbol: null, value: stats.online.draws, icon: Medal },
+            { key: 'o', label: 'Player 2 (O)', symbol: 'O', value: stats.online.oWins, icon: User },
           ]
         : [
-          {
-            key: 'x',
-            label: 'Player 1',
-            symbol: 'X',
-            value: stats.pvp.xWins,
-            icon: Crown,
-            accent: 'text-glow-cyan',
-          },
-          {
-            key: 'draw',
-            label: 'Draws',
-            symbol: 'X',
-            value: stats.pvp.draws,
-            icon: Medal,
-            accent: 'text-mist-500',
-          },
-          {
-            key: 'o',
-            label: 'Player 2',
-            symbol: 'O',
-            value: stats.pvp.oWins,
-            icon: User,
-            accent: 'text-glow-violet',
-          },
-        ]
+            { key: 'x', label: 'Player 1 (X)', symbol: 'X', value: stats.pvp.xWins, icon: Crown },
+            { key: 'draw', label: 'Draws', symbol: null, value: stats.pvp.draws, icon: Medal },
+            { key: 'o', label: 'Player 2 (O)', symbol: 'O', value: stats.pvp.oWins, icon: User },
+          ]
 
   return (
-    <section className="panel p-4" aria-label="Current match score">
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+    <section aria-label="Current match score">
+      <div className="score-board">
         {tiles.map((tile) => {
           const Icon = tile.icon
-          const isActive =
-            status === 'playing' && tile.key !== 'draw' && tile.symbol === currentPlayer
+          const active = status === 'playing' && tile.symbol === currentPlayer
           return (
             <div
               key={tile.key}
               data-testid={`score-${tile.key}`}
-              data-active={isActive}
-              data-accent={tile.symbol === 'O' ? 'violet' : 'cyan'}
-              className="score-card px-3 py-4 text-center"
+              data-active={active}
+              data-player={tile.symbol ?? undefined}
+              className="score-pill"
             >
-              <Icon className={`mx-auto size-5 ${tile.accent}`} aria-hidden="true" />
-              <p className="mt-2 text-3xl font-bold tabular-nums text-ink-700">
-                {tile.value}
-              </p>
-              <p className="mt-1 truncate text-[12px] font-medium text-mist-500 uppercase tracking-wider">
-                {tile.label}
-              </p>
+              <Icon
+                className={`size-4 ${
+                  tile.symbol === 'X'
+                    ? 'text-lime'
+                    : tile.symbol === 'O'
+                      ? 'text-cyan'
+                      : 'text-muted'
+                }`}
+                aria-hidden="true"
+              />
+              <span className="score-number">{tile.value}</span>
+              <span className="score-label">{tile.label}</span>
             </div>
           )
         })}
       </div>
 
-      <p className="mt-4 flex items-center justify-between text-[13px] tabular-nums text-mist-500">
+      <p className="mt-3 flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted">
+        <span>Round {roundNumber}</span>
         <span>
-          Round <span className="font-semibold text-ink-700">{roundNumber}</span>
-        </span>
-        <span>
-          {completedRounds} completed {completedRounds === 1 ? 'round' : 'rounds'}
+          {completedRounds} {completedRounds === 1 ? 'round' : 'rounds'} played
         </span>
       </p>
     </section>

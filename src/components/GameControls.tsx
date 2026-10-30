@@ -30,15 +30,13 @@ export function GameControls({
   return (
     <section className="panel p-4" aria-label="Game controls">
       {mode === 'pvc' ? (
-        <div className="mt-4">
-          <SegmentedControl
-            label="Computer difficulty"
-            name="ai-difficulty"
-            value={difficulty}
-            options={DIFFICULTY_OPTIONS}
-            onChange={onDifficultyChange}
-          />
-        </div>
+        <SegmentedControl
+          label="Computer difficulty"
+          name="ai-difficulty"
+          value={difficulty}
+          options={DIFFICULTY_OPTIONS}
+          onChange={onDifficultyChange}
+        />
       ) : null}
 
       {children}
@@ -56,7 +54,7 @@ export function GameControls({
         </div>
       ) : null}
 
-      <p className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-mist-500">
+      <p className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-muted">
         <Gauge className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
           {mode === 'pvc'

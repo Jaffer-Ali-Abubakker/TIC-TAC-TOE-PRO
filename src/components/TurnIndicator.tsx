@@ -37,7 +37,7 @@ export function TurnIndicator({
         label: 'Waiting for an opponent',
         hint: 'Share the room code to start the match',
         icon: User,
-        accent: 'text-mist-500',
+        accent: 'text-muted',
         accentKey: 'neutral',
       }
     } else if (mySymbol !== null && currentPlayer === mySymbol) {
@@ -45,7 +45,7 @@ export function TurnIndicator({
         label: 'Your turn',
         hint: 'Place your symbol',
         icon: User,
-        accent: 'text-glow-cyan',
+        accent: 'text-lime',
         accentKey: 'cyan',
       }
     } else {
@@ -53,7 +53,7 @@ export function TurnIndicator({
         label: "Opponent's turn",
         hint: 'Waiting for your opponent to move',
         icon: Bot,
-        accent: 'text-glow-violet',
+        accent: 'text-cyan',
         accentKey: 'violet',
       }
     }
@@ -64,14 +64,14 @@ export function TurnIndicator({
             label: 'Player 1 (X) to move',
             hint: 'Player 1, place an X',
             icon: User,
-            accent: 'text-glow-cyan',
+            accent: 'text-lime',
             accentKey: 'cyan',
           }
         : {
             label: 'Player 2 (O) to move',
             hint: 'Player 2, place an O',
             icon: User,
-            accent: 'text-glow-violet',
+            accent: 'text-cyan',
             accentKey: 'violet',
           }
   } else if (currentPlayer === humanSymbol) {
@@ -79,7 +79,7 @@ export function TurnIndicator({
       label: 'Your turn',
       hint: 'Place your symbol',
       icon: User,
-      accent: 'text-glow-cyan',
+      accent: 'text-lime',
       accentKey: 'cyan',
     }
   } else {
@@ -87,7 +87,7 @@ export function TurnIndicator({
       label: "Computer's turn",
       hint: 'The computer is thinking',
       icon: Bot,
-      accent: 'text-glow-violet',
+      accent: 'text-cyan',
       accentKey: 'violet',
     }
   }
@@ -99,22 +99,20 @@ export function TurnIndicator({
       role="status"
       aria-live="polite"
       data-accent={info.accentKey}
-      className="turn-banner flex items-center justify-center gap-3 px-4 py-3"
+      className="turn-indicator"
     >
       {mode === 'pvp' || mode === 'online' ? (
         <Users className={`size-5 ${info.accent}`} aria-hidden="true" />
       ) : (
         <Icon className={`size-5 ${info.accent}`} aria-hidden="true" />
       )}
-      <p className="text-sm font-medium text-ink-700">
-        {info.label}
-        <span className="sr-only">. {info.hint}</span>
-      </p>
+      <span className="turn-indicator-text">{info.label}</span>
+      <span className={`turn-indicator-dot ${info.accentKey === 'cyan' ? 'turn-indicator-dot--x' : info.accentKey === 'violet' ? 'turn-indicator-dot--o' : ''}`} aria-hidden="true" />
       {isThinking ? (
         <span className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="animate-think-pulse size-2 rounded-full bg-ink-700" />
-          <span className="animate-think-pulse size-2 rounded-full bg-ink-700 [animation-delay:150ms]" />
-          <span className="animate-think-pulse size-2 rounded-full bg-ink-700 [animation-delay:300ms]" />
+          <span className="animate-think-pulse size-2 rounded-full bg-text" />
+          <span className="animate-think-pulse size-2 rounded-full bg-text [animation-delay:150ms]" />
+          <span className="animate-think-pulse size-2 rounded-full bg-text [animation-delay:300ms]" />
         </span>
       ) : null}
     </div>

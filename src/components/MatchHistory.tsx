@@ -10,17 +10,17 @@ function MiniBoard({ board }: { board: Cell[] }) {
   return (
     <span
       aria-hidden="true"
-      className="grid size-10 shrink-0 grid-cols-3 gap-[2px] rounded-sm border border-ink-700 bg-white p-[3px]"
+      className="grid size-10 shrink-0 grid-cols-3 gap-[2px] rounded-sm border border-border bg-card p-[3px]"
     >
       {board.map((cell, index) => (
         <span
           key={index}
           className={`rounded-sm ${
             cell === 'X'
-              ? 'bg-glow-cyan'
+              ? 'bg-lime'
               : cell === 'O'
-                ? 'bg-glow-violet'
-                : 'bg-ink-100'
+                ? 'bg-cyan'
+                : 'bg-white/10'
           }`}
         />
       ))}
@@ -41,16 +41,16 @@ export function MatchHistory({ history, mode }: MatchHistoryProps) {
   return (
     <section className="panel p-4" aria-label="Match history">
       <div className="mb-4 flex items-center gap-3">
-        <Clock className="size-5 text-ink-700" aria-hidden="true" />
+        <Clock className="size-5 text-text" aria-hidden="true" />
         <h2 className="micro-label">Recent rounds</h2>
-        <span className="ml-auto text-[13px] tabular-nums text-mist-500">{history.length} / 20</span>
+        <span className="ml-auto text-[13px] tabular-nums text-muted">{history.length} / 20</span>
       </div>
 
       {history.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-ink-700 bg-white px-4 py-3 text-center">
-          <Trophy className="mx-auto size-5 text-mist-500" aria-hidden="true" />
-          <p className="mt-2 text-[13px] font-medium text-ink-700">No completed rounds yet</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-mist-500">
+        <div className="rounded-lg border-2 border-dashed border-border bg-card px-4 py-3 text-center">
+          <Trophy className="mx-auto size-5 text-muted" aria-hidden="true" />
+          <p className="mt-2 text-[13px] font-medium text-text">No completed rounds yet</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted">
             Finished rounds will be listed here with their final board.
           </p>
         </div>
@@ -67,14 +67,14 @@ export function MatchHistory({ history, mode }: MatchHistoryProps) {
               <li
                 key={entry.id}
                 data-testid="history-entry"
-                className="flex items-center gap-3 rounded-xl border-2 border-ink-700 bg-white px-3 py-2"
+                className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
               >
                 <MiniBoard board={entry.board} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-ink-700">
+                  <p className="truncate text-[13px] font-medium text-text">
                     Round {entry.round} - {resultLabel}
                   </p>
-                  <p className="mt-0.5 truncate text-[12px] text-mist-500">
+                  <p className="mt-0.5 truncate text-[12px] text-muted">
                     {entry.winnerLabel}
                     {entry.mode === 'pvp'
                       ? ' (two players)'
@@ -87,8 +87,8 @@ export function MatchHistory({ history, mode }: MatchHistoryProps) {
                 <span
                   className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider ${
                     entry.mode === mode
-                      ? 'bg-glow-cyan text-white'
-                      : 'bg-ink-100 text-mist-500'
+                      ? 'bg-lime text-void'
+                      : 'bg-border text-muted'
                   }`}
                 >
                   {entry.mode === 'pvp' ? '2P' : entry.mode === 'online' ? 'ON' : 'AI'}

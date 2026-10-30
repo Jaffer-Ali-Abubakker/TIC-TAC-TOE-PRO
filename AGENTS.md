@@ -40,7 +40,7 @@ Everything below was actually executed in this workspace, not merely planned.
 | Tests | `npm run test:run` | ✅ **245 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (304 kB JS / 93 kB gzip + a 214 kB lazy Supabase chunk) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (300 kB JS / 93 kB gzip + a 214 kB lazy Supabase chunk) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs |
@@ -475,45 +475,61 @@ regression.
 Tokens are defined once, in `src/styles/index.css`, inside the Tailwind v4 `@theme` block.
 
 ```
-Surfaces   --color-ink-950 #f7f3ea  (warm paper body background)
-           --color-ink-900 #ffffff  (white paper card surfaces)
-           --color-ink-700 #1a1a1e  (near-black ink: text, borders, cell lines)
-Text       --color-mist-500 #3a3a3e … --color-mist-100 #e9e9eb
-Accents    --color-glow-cyan #2563eb   (pen blue / X)
-           --color-glow-violet #dc2626 (marker red / O)
-           --color-glow-emerald #059669 (win)  --color-glow-amber #d97706 (draw)
-           --color-glow-rose #e11d48 (loss)
-Radii      --radius-card 0.75rem
-Shadow     --shadow-panel / --shadow-raised: 4px 4px 0 #1a1a1e (hard offset, flat)
-Font       --font-sans: system stack (NO web font is downloaded)
+Surfaces   --color-void  #0a0a0f  (page background)
+           --color-panel #15151e  (cards, board container, dialogs)
+           --color-card   #1e1e2a  (cells, inset panels, pills)
+Text       --color-text  #f8f8f2   --color-muted #8a8a9a
+Accents    --color-lime    #ccff00  (X, primary action, winning line)
+           --color-cyan    #00f5ff  (O)
+           --color-emerald #10b981  (connected / success)
+           --color-amber   #f59e0b  (draw, warnings)
+           --color-rose    #e11d48  (loss, destructive)
+Lines      --color-border: rgba(255,255,255,0.08)
+Radii      --radius-card 1rem
+Shadow     --shadow-panel 0 20px 60px rgba(0,0,0,.5) + --shadow-inset hairline
+Font       --font-display 'Space Grotesk' (Google Fonts), --font-mono 'JetBrains Mono'
 ```
 
-Reusable CSS classes defined by hand in the same file: `.panel`, `.panel-inset`, `.brand-mark`,
-`.cell-button`, `.segmented-option`, `.app-shell`, `.grid-texture`, `.main-container`,
-`.board-stage`, `.side-rail`, `.board-grid`, `.micro-label`, `.helper-text`, `.btn`,
-`.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.turn-banner`,
-`.score-card`, `.result-banner`, `.waiting-card`, `.live-dot`.
+The two web fonts are the only external asset. They load from Google Fonts and fall back to the
+system UI / monospace stack, so the game still renders offline.
 
-Motion keyframes: `symbol-pop` (220 ms overshoot), `win-pulse` (1.5 s loop), `result-in` (220 ms),
-`think-pulse` (1.1 s loop), `live-dot` (2 s heartbeat) — all neutralised by a
-`prefers-reduced-motion: reduce` block.
+Reusable CSS classes defined by hand in the same file: `.scene`, `.scene-grid`, `.scene-blob`,
+`.app-shell`, `.header`, `.header-brand`, `.mode-switcher`, `.main-container`, `.board-stage`,
+`.side-rail`, `.panel`, `.panel-inset`, `.board-container`, `.board-grid`, `.cell-button`,
+`.mark-x`, `.mark-o`, `.winning-line`, `.turn-indicator`, `.score-board`, `.score-pill`,
+`.score-number`, `.score-label`, `.micro-label`, `.helper-text`, `.segmented-option`, `.btn`,
+`.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-ghost-danger`, `.btn-icon`,
+`.result-banner`, `.result-title`, `.dialog-overlay`, `.dialog-panel`, `.waiting-card`, `.live-dot`.
 
-Layout rules that must be preserved:
+Motion keyframes: `mark-pop` (the one hero animation: 400 ms overshoot on a placed symbol),
+`win-pulse` (1.5 s loop on the winning cells), `dot-pulse`, `think-pulse`, `result-in`,
+`dialog-pop`, `fade-in` � all neutralised by a `prefers-reduced-motion: reduce` block.
+Everything else is a quiet colour/transform transition.
 
+Rules that must be preserved:
+
+- **Unlayered custom CSS beats Tailwind utilities.** Every class above is written outside
+  `@layer`, so a utility on the same element (`.btn` + `size-10` + `px-0`) loses. Use the
+  `.btn-icon` class for square icon buttons instead of overriding padding with utilities.
+- The winning line is an **absolutely positioned** child of `.board-grid` with a `grid-area`
+  from `WINNING_LINES`. Do not make it a normal grid item: a definite grid placement is resolved
+  before auto-placement, so a static line would push the nine cells down one row.
 - `body` and `.app-shell` both have `overflow-x: hidden`.
 - Default (phones, short windows): stacked, normally scrolling layout.
+- The header wraps: brand and the sound/settings buttons on the first row, the mode switcher on
+  its own full-width row below 640 px (the pills drop their icons there so they stay on one line).
 - Viewport-fit (`@media (min-width: 1024px) and (min-height: 600px)`):
   - `.app-shell` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
-  - Header is one compact bar (~56-64px): brand left, game-mode switcher middle,
-    sound/settings buttons right.
-  - `.main-container` is `flex: 1`, `min-height: 0`, two columns: board stage
-    (`minmax(0, 1fr)`) and side rail (~19rem).
+  - Header is one compact bar (64px): brand left, mode switcher middle, buttons right.
+  - `.main-container` is `flex: 1`, `min-height: 0`, `flex-direction: row`: board stage
+    (`flex: 1 1 auto`, `max-width: 34rem`) and side rail (`flex: 0 0 20rem`).
   - `.board-stage` scrolls internally (`overflow-y: auto`); `.side-rail` scrolls internally
     (`overflow-y: auto`); the page never scrolls.
-  - Board grid: `width: min(26rem, 100%, 54dvh)`, cells keep `aspect-ratio: 1`.
+  - Board container: `width: min(23rem, 100%, 50dvh)`, `aspect-ratio: 1`, square cells.
 - Online and waiting-room cards are centred in the stage column; they scroll internally
   when the window is too short.
-- Dialogs: `max-h-[calc(100dvh-1.5rem)] overflow-y-auto`.
+- Dialogs: `width: min(32rem, 100vw - 1.5rem)`, `max-height: calc(100dvh - 1.5rem)`,
+  `overflow-y: auto`.
 
 ---
 
@@ -535,7 +551,7 @@ Layout rules that must be preserved:
 
 ## 13. Testing strategy
 
-226 tests in 13 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
+245 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
 after each test and polyfills `matchMedia` / `scrollTo`.
 
 | Suite | Focus |
@@ -895,22 +911,24 @@ the expected version.
   profiles over the DevTools Protocol (see §16). Both boards converged and the database recorded
   the room, both seats and both moves.
 
-**Phase 4 — visual redesign (Notebook theme)**
+**Phase 4 — visual redesign (Arcade / Stadium theme)**
 
-- Flipped `@theme` tokens to a warm-paper palette: ink-950 `#f7f3ea` paper background,
-  white paper card surfaces, near-black ink-700 text/borders; pen blue X, marker red O,
-  emerald win, amber draw, rose loss. Flat colour only — no gradients, glow, blur.
-- Replaced `.panel`/`.panel-inset`/`.panel-raised` with white ink-bordered cards and
-  `4px 4px 0` hard offset shadows; restyled `.grid-texture` as light grid lines.
-- Viewport-fit layout: `@media (min-width: 1024px) and (min-height: 600px)` makes
-  `.app-shell` a `100dvh` column flex with `overflow: hidden`; header is a compact bar
-  with the mode switcher moved inside; two-column main with internally scrolling side rail;
-  board sized `min(26rem, 100%, 54dvh)` with `aspect-ratio: 1` cells. Below breakpoints,
-  the stacked scrolling layout is preserved.
-- Press-physics button system (flat colour blocks, 2px ink border, hard shadow,
-  hover-lift, press-down) with one primary per screen.
-- Press-physics buttons and notebook cell styling (paper squares, ink borders, mark pop
-  overshoot).
+- Replaced the previous notebook palette with a dark neon arena: `--color-void #0a0a0f` page,
+  `--color-panel #15151e` cards, `--color-card #1e1e2a` cells, lime `#ccff00` X and primary
+  action, cyan `#00f5ff` O, emerald connected, amber draw, rose loss. Hard shadows, glow only on
+  marks and the winning line.
+- Typography switched to the `--font-display` (Space Grotesk) / `--font-mono` (JetBrains Mono)
+  pair loaded from Google Fonts, with system fallbacks so an offline load still renders.
+- Decorated scene layer (`.scene`): 24 px grid, two blurred corner blobs and a pointer spotlight
+  driven by `--mouse-x` / `--mouse-y` set from a single `pointermove` listener in `App.tsx`
+  (skipped when `matchMedia('(pointer: fine)')` is false).
+- The X and O marks are now pure CSS (`.mark-x` crossed bars, `.mark-o` ring), so the symbol
+  differs by shape without any icon dependency. `mark-pop` is the single hero animation.
+- The winning line is an absolutely positioned element inside its `grid-area`, so it never takes
+  a cell slot; winning cells also keep the `win-pulse` glow.
+- Game controls, scoreboard, statistics, history, dialogs and all five online screens were
+  restyled onto the shared `.panel` / `.panel-inset` / `.btn` / `.segmented-option` vocabulary.
+  No props, state flow, labels or test ids changed.
 - Updated §11 design-system docs and this changelog entry.
 
 ---
@@ -941,6 +959,6 @@ The exact steps are in the README under *Online multiplayer setup*.
 
 ---
 
-*Last verified: 2026-10-20 — Windows 11, Node v22.23.2, npm 10.9.8.
-226/226 tests passing (incl. 37 database tests on a real PostgreSQL engine) · typecheck clean ·
+*Last verified: 2026-10-30 — Windows 11, Node v22.23.2, npm 10.9.8.
+245/245 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
 lint clean · production build clean.*

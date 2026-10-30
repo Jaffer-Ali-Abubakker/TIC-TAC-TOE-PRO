@@ -44,7 +44,7 @@ export function SegmentedControl<T extends string>({
           return (
             <label
               key={option.value}
-              className="segmented-option inline-flex flex-1 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-ink-700 bg-ink-950 px-3 py-2 text-sm font-medium text-ink-700 hover:border-ink-600 hover:text-ink-700"
+              className="segmented-option"
               data-selected={selected}
               title={option.hint}
             >
@@ -55,6 +55,7 @@ export function SegmentedControl<T extends string>({
                 checked={selected}
                 onChange={() => onChange(option.value)}
                 className="sr-only"
+                disabled={disabled}
               />
               {option.icon}
               <span>{option.label}</span>

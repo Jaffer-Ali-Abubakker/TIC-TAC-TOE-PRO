@@ -20,6 +20,21 @@ const ARROW_DELTAS: Record<string, { row: number; column: number }> = {
 }
 
 /**
+ * The winning line is positioned inside its own grid area, so the browser does
+ * the geometry: no measurement, no resize listener.
+ */
+const WINNING_LINES: Record<string, { area: string; kind: 'h' | 'v' | 'diag' | 'diag-inv' }> = {
+  '0,1,2': { area: '1 / 1 / 2 / 4', kind: 'h' },
+  '3,4,5': { area: '2 / 1 / 3 / 4', kind: 'h' },
+  '6,7,8': { area: '3 / 1 / 4 / 4', kind: 'h' },
+  '0,3,6': { area: '1 / 1 / 4 / 2', kind: 'v' },
+  '1,4,7': { area: '1 / 2 / 4 / 3', kind: 'v' },
+  '2,5,8': { area: '1 / 3 / 4 / 4', kind: 'v' },
+  '0,4,8': { area: '1 / 1 / 4 / 4', kind: 'diag' },
+  '2,4,6': { area: '1 / 1 / 4 / 4', kind: 'diag-inv' },
+}
+
+/**
  * The 3x3 board.
  *
  * Uses a roving tab index so the whole board is a single tab stop and the
@@ -57,15 +72,11 @@ export function GameBoard({
   )
 
   const winning = winningCombination ?? []
+  const line = winning.length === 3 ? WINNING_LINES[[...winning].sort().join(',')] : undefined
 
   return (
-    <div
-      ref={containerRef}
-      role="group"
-      aria-label="Game board"
-      className="board-grid"
-    >
-      <div className="grid gap-2 sm:gap-3">
+    <div className="board-container">
+      <div ref={containerRef} role="group" aria-label="Game board" className="board-grid">
         {board.map((value, index) => (
           <GameCell
             key={index}
@@ -81,6 +92,13 @@ export function GameBoard({
             onKeyDown={handleKeyDown}
           />
         ))}
+        {line ? (
+          <span
+            aria-hidden="true"
+            className={`winning-line winning-line--${line.kind}`}
+            style={{ gridArea: line.area }}
+          />
+        ) : null}
       </div>
       <p className="sr-only">
         {`Current turn: ${currentPlayer}. Use the arrow keys to move between cells.`}

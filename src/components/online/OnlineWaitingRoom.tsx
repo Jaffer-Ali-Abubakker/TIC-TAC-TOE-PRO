@@ -54,18 +54,18 @@ export function OnlineWaitingRoom({
   return (
     <section className="panel p-4 sm:p-6" aria-label="Waiting for opponent">
       <div className="flex flex-col items-center text-center">
-        <span className="waiting-card flex size-12 items-center justify-center rounded-sm border border-glow-cyan bg-white shadow-panel">
-          <UserPlus className="size-5 text-glow-cyan" aria-hidden="true" />
+        <span className="waiting-card flex size-12 items-center justify-center rounded-sm border-2 border-lime bg-card shadow-panel">
+          <UserPlus className="size-5 text-lime" aria-hidden="true" />
         </span>
-        <h2 className="mt-4 text-lg font-bold tracking-tight text-ink-700">
+        <h2 className="mt-4 text-lg font-bold tracking-tight text-text">
           Waiting for your opponent
         </h2>
-        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-mist-500">
+        <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted">
           Share the room code or the invite link. The match starts as soon as a second player
           joins.
         </p>
 
-        <p className="mt-6 rounded-sm border-2 border-ink-700 bg-white px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-ink-700 sm:text-3xl sm:tracking-[0.3em]">
+        <p className="mt-6 rounded-sm border-2 border-border bg-card px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-text sm:text-3xl sm:tracking-[0.3em]">
           {formatted}
         </p>
 
@@ -89,8 +89,8 @@ export function OnlineWaitingRoom({
             role="status"
             className={`mt-4 inline-flex items-center gap-2 rounded-sm px-3 py-2 text-[13px] ${
               notice.tone === 'ok'
-                ? 'bg-glow-emerald/10 text-glow-emerald border border-glow-emerald'
-                : 'bg-glow-rose/10 text-glow-rose border border-glow-rose'
+                ? 'bg-emerald/10 text-emerald border border-emerald'
+                : 'bg-rose/10 text-rose border border-rose'
             }`}
           >
             {notice.tone === 'ok' ? <Check className="size-4" aria-hidden="true" /> : null}
@@ -98,7 +98,7 @@ export function OnlineWaitingRoom({
           </p>
         ) : null}
 
-        <div className="mt-6 w-full border-t-2 border-t-ink-700 pt-4">
+        <div className="mt-6 w-full border-t border-border pt-4">
           <button
             type="button"
             onClick={onLeave}

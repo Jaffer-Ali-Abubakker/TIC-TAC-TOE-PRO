@@ -1,5 +1,4 @@
 import type { KeyboardEvent } from 'react'
-import { Circle, X } from 'lucide-react'
 import type { Cell } from '../game/types'
 
 export interface GameCellProps {
@@ -48,28 +47,18 @@ export function GameCell({
         onSelect(index)
       }}
       onKeyDown={(event) => onKeyDown(index, event)}
-      className={`cell-button relative flex aspect-square w-full items-center justify-center rounded-2xl ${
-        isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
-      }`}
+      className="cell-button"
     >
       {value === 'X' ? (
-        <X
-          className={`mark-x size-[52%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
-          strokeWidth={2.75}
+        <span
+          className={`mark-x ${isLastMove ? 'animate-mark-pop' : ''}`}
           aria-hidden="true"
         />
       ) : null}
       {value === 'O' ? (
-        <Circle
-          className={`mark-o size-[46%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
-          strokeWidth={2.75}
-          aria-hidden="true"
-        />
-      ) : null}
-      {isWinning ? (
         <span
+          className={`mark-o ${isLastMove ? 'animate-mark-pop' : ''}`}
           aria-hidden="true"
-          className="animate-win-pulse pointer-events-none absolute inset-0 rounded-2xl border-2 border-glow-emerald"
         />
       ) : null}
     </button>

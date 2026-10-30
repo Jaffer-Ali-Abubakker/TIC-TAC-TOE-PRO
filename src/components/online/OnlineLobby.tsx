@@ -41,16 +41,16 @@ export function OnlineLobby({
   return (
     <section className="panel p-4 sm:p-6" aria-label="Online multiplayer lobby">
       <div className="mb-4 flex items-center gap-3">
-        <Users className="size-5 text-glow-cyan" aria-hidden="true" />
+        <Users className="size-5 text-lime" aria-hidden="true" />
         <h2 className="micro-label">Online multiplayer</h2>
       </div>
 
       <div className="panel-inset p-3">
-        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-mist-500">
+        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-muted">
           Your name (optional)
         </label>
         <div className="mt-2 flex items-center gap-2">
-          <User className="size-4 shrink-0 text-mist-500" aria-hidden="true" />
+          <User className="size-4 shrink-0 text-muted" aria-hidden="true" />
           <input
             id="online-display-name"
             type="text"
@@ -58,7 +58,7 @@ export function OnlineLobby({
             maxLength={24}
             placeholder="Player"
             onChange={(event) => onDisplayNameChange(event.target.value)}
-            className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+            className="w-0 min-w-0 flex-1 rounded-sm border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-muted focus:border-lime/60 focus:outline-none"
           />
         </div>
         <p className="helper-text mt-2">
@@ -67,12 +67,12 @@ export function OnlineLobby({
       </div>
 
       {inviteCode ? (
-        <div className="mt-4 rounded-xl border-2 border-glow-cyan bg-glow-cyan/10 p-3">
-          <p className="flex items-center gap-2 text-[13px] font-semibold text-glow-cyan">
+        <div className="mt-4 rounded-lg border-2 border-lime bg-lime/10 p-3">
+          <p className="flex items-center gap-2 text-[13px] font-semibold text-lime">
             <Link2 className="size-4" aria-hidden="true" />
             You were invited to a room
           </p>
-          <p className="mt-1 font-mono text-lg tracking-widest text-ink-700">
+          <p className="mt-1 font-mono text-lg tracking-widest text-text">
             {formatRoomCode(inviteCode)}
           </p>
           <button
@@ -99,7 +99,7 @@ export function OnlineLobby({
         </button>
 
         <div className="panel-inset p-3">
-          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-mist-500">
+          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-muted">
             Join with a room code
           </label>
           <div className="mt-2 flex gap-2">
@@ -123,7 +123,7 @@ export function OnlineLobby({
                   submitJoin()
                 }
               }}
-              className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 font-mono text-sm uppercase tracking-widest text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+              className="w-0 min-w-0 flex-1 rounded-sm border border-border bg-card px-3 py-2 font-mono text-sm uppercase tracking-widest text-text placeholder:text-muted focus:border-lime/60 focus:outline-none"
             />
             <button
               type="button"
@@ -135,7 +135,7 @@ export function OnlineLobby({
             </button>
           </div>
           {codeError ? (
-            <p id="online-room-code-error" role="alert" className="mt-2 text-[12px] text-glow-rose">
+            <p id="online-room-code-error" role="alert" className="mt-2 text-[12px] text-rose">
               {codeError}
             </p>
           ) : (
@@ -149,7 +149,7 @@ export function OnlineLobby({
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
+          className="mt-4 rounded-lg border-2 border-rose bg-rose/10 px-3 py-2 text-sm text-rose"
         >
           {error}
         </p>
