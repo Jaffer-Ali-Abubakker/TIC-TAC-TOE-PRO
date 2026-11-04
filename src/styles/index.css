@@ -504,7 +504,8 @@ html {
 
 @media (min-width: 1024px) {
   .header {
-    height: 64px;
+    height: 56px;
+    min-height: 56px;
     padding: 0 2rem;
   }
 }
@@ -593,8 +594,10 @@ html {
  * ------------------------------------------------------------------ */
 .board-container {
   /* The board is the hero: roughly a third larger than before, still capped by
-     the viewport height so the score and the actions stay visible. */
-  width: min(30rem, 100%, calc(50dvh * var(--board-cols, 3) / var(--board-rows, 3)));
+     the viewport height so the score and the actions stay visible.
+     `--board-max` is the width cap; the height cap is the second term. */
+  --board-max: 30rem;
+  width: min(var(--board-max), 100%, calc(50dvh * var(--board-cols, 3) / var(--board-rows, 3)));
   margin: 0 auto;
   padding: 0.75rem;
   border: 1px solid var(--color-border);
@@ -613,13 +616,13 @@ html {
 
 /* Bigger boards: tighter gaps, smaller radius, thinner and dimmer marks. */
 .board-container[data-density='tight'] {
-  width: min(32rem, 100%, calc(50dvh * var(--board-cols, 3) / var(--board-rows, 3)));
+  --board-max: 32rem;
   padding: 0.625rem;
   border-radius: 1.5rem;
 }
 
 .board-container[data-density='dense'] {
-  width: min(34rem, 100%, calc(50dvh * var(--board-cols, 3) / var(--board-rows, 3)));
+  --board-max: 34rem;
   padding: 0.5rem;
   border-radius: 1rem;
 }
@@ -652,6 +655,23 @@ html {
 
   .board-container[data-density='dense'] .board-grid {
     gap: 0.25rem;
+  }
+}
+
+/* Laptop fit: on a desktop the board is the only block allowed to give up
+   height. The 464px is everything around it that must stay visible (compact
+   header, paddings, status row, score, actions and their gaps), so the board
+   shrinks to the leftover viewport height instead of pushing the score below
+   the fold on a 1008 px / 768 px laptop.
+   shortcut: the 12rem floor keeps cells tappable on very tall grids (e.g.
+   10 rows x 3 cols), which then scroll inside the stage instead of fitting. */
+@media (min-width: 1024px) and (min-height: 600px) {
+  .board-container {
+    width: min(
+      var(--board-max),
+      100%,
+      max(12rem, calc((100dvh - 464px) * var(--board-cols, 3) / var(--board-rows, 3)))
+    );
   }
 }
 

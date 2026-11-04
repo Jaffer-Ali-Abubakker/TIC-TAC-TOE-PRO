@@ -45,6 +45,7 @@ Everything below was actually executed in this workspace, not merely planned.
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
 | Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 314 / scrollWidth 314` on a 320 px viewport — none, in every mode and on 3×3 / 4×4 / 10×10 |
+| Laptop viewport fit (TIC-003) | Playwright on the preview build | ✅ 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768, 1280×720 — page and centre column never scroll and the score row plus Restart/New Match stay inside the viewport (board 480 / 480 / 480 / 436 / 304 / 256 px) |
 | Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 2 migrations recorded |
 | Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
 | **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
@@ -518,6 +519,13 @@ regression.
     sets `min-width: 0`. For the same reason `.segmented-option` is `position: relative`: the
     `sr-only` radio was positioned against the page and extended `scrollWidth` past the scroller.
     After any layout change, check `document.documentElement.scrollWidth === clientWidth`.
+37. **A desktop `height` on the header is not a cap: `min-height` wins.** `.header` carries
+    `min-height: 64px` (it wraps on a phone), so `@media (min-width: 1024px) { height: 56px }` had
+    no effect until `min-height: 56px` was set in the same block. Likewise the board is capped by
+    *two* terms — `--board-max` for width and `calc((100dvh - 464px) * cols / rows)` for height —
+    and the 464 is the measured height of everything else in the column. If you add a row to the
+    stage, add its height there or the score/actions fall out of the first fold on a laptop
+    (that was the 1920×1008 cut-off).
 
 ---
 
@@ -589,11 +597,18 @@ Rules that must be preserved:
   on a phone the group itself is the single card. Max width 90rem.
 - Viewport-fit (`@media (min-width: 1024px) and (min-height: 600px)`):
   - `.app-shell` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
-  - Header is one compact bar (64px): brand left, mode switcher middle, buttons right.
+  - Header is one compact 56px bar: brand left, mode switcher middle, buttons right.
+    (`min-height` had to be lowered too — the base `min-height: 64px` silently wins over a plain
+    `height: 56px`.)
   - `.main-container` is `flex: 1`, `min-height: 0`; `.board-stage` and both `.side-rail`s scroll
     internally (`overflow-y: auto`); the page never scrolls.
-  - Board container: `width: min(30rem, 100%, calc(50dvh * cols / rows))`, growing to `32rem`
-    (`data-density='tight'`, 5–6 lines) and `34rem` (`dense`, 7–10 lines). No container
+  - Board container: `--board-max` (30rem, `data-density='tight'` 32rem, `dense` 34rem) is the
+    **width** cap; the **height** cap is
+    `max(12rem, calc((100dvh - 464px) * cols / rows))`. The 464 px is the fixed chrome that must
+    stay on screen (56px header, container padding, `.stage-status`, `.score-board`,`.stage-actions`
+    and their 14px gaps), so the board gives up height first: 480 px at 1032/1008 px tall,
+    436 at 900, 336 at 800, 304 at 768, 256 at 720. Tune that constant, not the individual
+    paddings, if the stack ever grows or shrinks (trap 37). No container
     `aspect-ratio`: the cells are `aspect-ratio: 1/1` and the rows size to them, so cells stay
     square on every grid. The container writes `--board-cols` / `--board-rows`, and the grid uses
     `grid-template-columns: repeat(var(--board-cols), minmax(0, 1fr))`.
@@ -849,6 +864,22 @@ width, so **verify narrow viewports through an iframe harness**:
 4. **Delete the harness from `dist/` afterwards** (it is a build artifact directory) and remember
    that `npm run build` **wipes `dist/`**.
 
+Desktop heights are the other half of the check, and Playwright does it without a harness
+(`browser_resize`, which honours the exact height, unlike `--window-size`):
+
+- **1920×1032 is the 34 inch desktop** the layout was designed on: the board takes its full
+  480 px and the score row and both action buttons are visible with 110 px of slack.
+- **1920×1008 is the laptop that used to be cut off.** Note that 1008 px is the *screen*: with
+  browser chrome the usable viewport is about 800 px, so resize the browser to **1920×800 /
+  1366×768** to reproduce it. There the board drops to 336 / 304 px and `Restart round` /
+  `New match` must stay inside the viewport **without an outer scroll**. Fixed by the compact
+  56 px header plus the board height cap (§11, trap 37).
+- Also check **1512×982, 1440×900, 1366×768 and 1280×720**. For each one assert
+  `document.documentElement.scrollHeight === clientHeight`,
+  `.board-stage` `scrollHeight === clientHeight`, and
+  `document.querySelector('.stage-actions').getBoundingClientRect().bottom <= innerHeight`.
+- Then the narrow end: **375 px and 320 px**, where `scrollWidth === clientWidth` is the gate.
+
 For the online mode you can additionally point the app at a throwaway mock of the Supabase
 Auth/PostgREST endpoints (a small Node `http` server) and drive a full create → invite → join →
 move session in the browser. That is how the online flow was verified locally. The mock is a
@@ -929,6 +960,12 @@ npm run build        # succeeds
 Plus, for anything user-visible: a headless-Chrome screenshot at desktop **and** 320 px, with
 `scrollWidth === clientWidth` confirmed for the narrow viewport. For the board, check the classic
 3×3 **and** the extreme 10×10 (square cells, winning line overlay, controls still reachable).
+
+For any layout or board-sizing change, the height gate is separate from the width gate: verify at
+**1280×720** (small laptop) and **1920×800** (laptop with browser chrome) that the board, the score
+row and `Restart round` / `New match` are all visible in the first fold, with
+`scrollHeight === clientHeight` on the page and on `.board-stage`. A board that looks right on a
+34 inch display but is cut off on a laptop is the exact regression TIC-003 fixed (§16).
 
 If you touch the database, also run:
 
@@ -1054,6 +1091,28 @@ the expected version.
 - Design tokens: `--radius-card` is 20 px. Layout verified with Playwright at 1400, 1280, 1024,
   375 and 320 px: 280/704/320 columns at 1400 px, 450 px board, 10×10 = 100 square cells with a
   4 px gap, `scrollWidth === clientWidth` at 320 px (314/314), and the 3×3 win overlay unchanged.
+
+**Phase 7 — laptop viewport fit (TIC-003)**
+
+- **Bug:** on a 34 inch 1920×1032 display everything was visible, but on a 1920×1008 laptop
+  (~800 px of usable viewport) the board was cut off at the bottom and the score pills and the
+  restart buttons fell below the fold. The board was capped by width and by `50dvh` only, which
+  counts none of the fixed chrome (header, paddings, status row, score, actions).
+- The board is now the only block that gives up height: `width = min(--board-max, 100%,
+  max(12rem, (100dvh - 464px) × cols / rows))` inside the existing
+  `min-width: 1024px and min-height: 600px` media query. `--board-max` keeps the density caps
+  (30 / 32 / 34 rem), so the three width rules collapsed into one declaration plus a variable.
+  Board width by height: 480 px at 1032 and 1008, 436 at 900, 336 at 800, 304 at 768, 256 at 720.
+- Desktop header is 56 px instead of 64 px. `min-height: 56px` had to be set with it — the base
+  `min-height: 64px` silently wins over a bare `height` (trap 37).
+- Mobile is untouched: the 100dvh cap only applies from 1024 × 600 px, so phones still scroll the
+  page and keep the `50dvh` board.
+- Verified with Playwright on the preview build at 1920×1032, 1920×1008, 1512×982, 1440×900,
+  1366×768 and 1280×720: page and `.board-stage` never scroll (`scrollHeight === clientHeight`),
+  the actions row bottom stays inside the viewport with 22 px to spare, and there is no horizontal
+  overflow at 375 px (369/369) or 320 px (314/314), including a 10×10 board.
+- `README.md` gained a "Laptop viewport fit" section and the TIC-002 board-size/AI/online-limit
+  notes; §11, §16, §19 and trap 37 of this file were updated with the real numbers.
 
 ---
 

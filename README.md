@@ -58,7 +58,9 @@ not the browser - decides whether a move is legal.
 - Player vs Computer with an easy, medium and unbeatable hard AI.
 - Two players on the same device.
 - Board sizes from 3×3 up to 10×10 (100 cells), chosen from presets or with
-  custom rows and columns.
+  custom rows and columns. The win length adapts (3 on 3×3, 4 up to 7×7, 5 above
+  that) and so does the AI: full minimax on 3×3, four plies up to 16 cells and a
+  line heuristic above that, so even a 10×10 reply arrives in a few milliseconds.
 - Scoreboard, per-mode statistics and a 20-entry match history.
 - Restart round, new match, settings dialog and optional sound effects.
 - Everything persists in `localStorage`.
@@ -670,10 +672,10 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 
 - Mobile first, from a **320 px** viewport upwards - there is no horizontal
   overflow at 320 px in any of the three modes.
-- The cells are always square. The board is capped at `min(30rem, 100%, 50dvh)`
-  on the classic grid and grows a little (`32rem`, then `34rem`) as the grid
-  gets bigger, so a 10×10 board still fits on a phone: no horizontal overflow,
-  and the page keeps scrolling vertically.
+- The cells are always square. On a phone the board is capped at
+  `min(30rem, 100%, 50dvh)` on the classic grid and grows a little (`32rem`,
+  then `34rem`) as the grid gets bigger, so a 10×10 board still fits: no
+  horizontal overflow, and the page keeps scrolling vertically.
 - One column on a phone, in game order: **board → round/turn → score →
   restart/new match → difficulty and board size → match statistics → recent
   rounds**. The two records panels are collapsed behind their own toggle there.
@@ -683,6 +685,33 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
   stacking, so both groups stay in one card.
 - Dialogs are capped at `calc(100dvh - 1.5rem)` and scroll internally.
 - Safe areas are respected via `env(safe-area-inset-bottom)`.
+
+### Laptop viewport fit
+
+The board used to be sized by width alone, which was fine on a tall 1920×1032
+display but pushed the score and the restart buttons below the fold on a
+1920×1008 laptop (about 800 px of usable height).
+
+Now, on a desktop (`min-width: 1024px` and `min-height: 600px`), the board is the
+only block allowed to give up height:
+
+- `height: 100dvh; overflow: hidden` on `.app-shell` - the page itself never
+  scrolls; the three columns scroll internally with the themed thin scrollbar.
+- The header is 56 px on a desktop instead of 64 px.
+- The board width is
+  `min(var(--board-max), 100%, max(12rem, (100dvh - 464px) × cols / rows))`.
+  The 464 px is the header, paddings, round/turn row, score and actions that
+  must stay visible, so the board shrinks to the leftover height - 480 px on a
+  1032 px tall display, 436 px at 900 px, 304 px at 768 px and 256 px at 720 px
+  - and the score pills and the restart/new match buttons never leave the first
+  fold.
+- `cols / rows` keeps non-square grids honest: a 3×10 board gets a wide, short
+  frame and a 10×3 board a narrow, tall one. Extremely tall grids stop at 12 rem
+  so the cells stay tappable and scroll inside the stage instead.
+
+Verified at 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768 and 1280×720:
+`scrollHeight === clientHeight` for the page and for the centre column, and the
+actions row is always the last thing inside the viewport.
 
 ## Project structure
 
@@ -744,10 +773,10 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     │       ├── OnlineSetupNotice.tsx  # "Not configured" panel
     │       └── OnlineWaitingRoom.tsx  # Room code, copy, share, leave
     ├── game/
-    │   ├── ai.ts                  # Easy / medium / hard computer opponent
-    │   ├── gameLogic.ts           # Pure rules engine (no React, no DOM)
-    │   ├── gameReducer.ts         # Central state machine and selectors
-    │   └── types.ts               # Shared domain types
+    │   ├── ai.ts                  # Easy / medium / hard, adaptive to the grid shape
+    │   ├── gameLogic.ts           # Pure rules engine; win lines generated per grid
+    │   ├── gameReducer.ts         # State machine, scoring, board-size action
+    │   └── types.ts               # Shared domain types (incl. BoardSize)
     ├── hooks/
     │   └── usePersistentState.ts  # De-duplicated localStorage persistence
     ├── online/
@@ -767,7 +796,7 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     └── utils/
         ├── clipboard.ts           # Clipboard and Web Share with fallbacks
         ├── sound.ts               # Web Audio API sound effects
-        └── storage.ts             # Versioned, validated persistence layer
+        └── storage.ts             # Versioned persistence (v3 adds the board size)
 ```
 
 ## Game rules
@@ -862,5 +891,7 @@ Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
   synchronised between devices and are not global.
 - The hard AI is only *unbeatable* on 3×3. On bigger boards it searches four
   plies (4×4) or plays a line heuristic (5×5 and up), so a strong human can win.
+- Online multiplayer is **3×3 only**. Bigger boards (4×4 up to 10×10) are local
+  modes only; the server payload is nine cells by design.
 - Sound effects use the Web Audio API. Some browsers block audio until the
   first interaction; the game is unaffected and simply stays silent.
