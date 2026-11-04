@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { GameHeader } from './components/GameHeader'
 import { ScoreBoard } from './components/ScoreBoard'
 import { GameBoard } from './components/GameBoard'
-import { GameControls } from './components/GameControls'
+import { RoundControls, SettingsCards } from './components/GameControls'
 import { GameResult } from './components/GameResult'
 import { TurnIndicator } from './components/TurnIndicator'
 import { MatchStats } from './components/MatchStats'
 import { MatchHistory } from './components/MatchHistory'
+import { RailSection } from './components/RailSection'
 import { SettingsDialog } from './components/SettingsDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { OnlineLobby } from './components/online/OnlineLobby'
@@ -374,6 +375,9 @@ export default function App() {
   const onlineStatus = onlineRoomState?.room.status ?? null
   const waitingForOpponent = isOnline && onlineStatus === 'waiting'
   const endedWithoutWinner = isOnline && onlineStatus === 'finished' && !onlineRoomState?.room.result
+  // The board (and its status row) is hidden while the online lobby asks for a room.
+  const showBoard =
+    !isOnline || (onlineConfig.ok && onlineRoomState !== null && !waitingForOpponent)
 
   const boardInteractive = isOnline
     ? state.status === 'playing' &&
@@ -384,37 +388,16 @@ export default function App() {
       (state.mode === 'pvp' || state.currentPlayer === state.humanSymbol)
 
   const boardPanel = (
-    <section className="panel flex flex-col gap-4 p-4 sm:p-6" aria-label="Game">
-      <TurnIndicator
-        mode={state.mode}
+    <section className="panel stage-board p-3 sm:p-4" aria-label="Game">
+      <GameBoard
+        board={state.board}
+        rows={boardSize.rows}
+        cols={boardSize.cols}
+        winningCombination={state.winningCombination}
+        lastMoveIndex={state.lastMoveIndex}
         currentPlayer={state.currentPlayer}
-        humanSymbol={state.humanSymbol}
-        isThinking={thinking}
-        mySymbol={state.onlineSymbol}
-        waitingForOpponent={waitingForOpponent}
-      />
-
-      <div className="my-2">
-        <GameBoard
-          board={state.board}
-          rows={boardSize.rows}
-          cols={boardSize.cols}
-          winningCombination={state.winningCombination}
-          lastMoveIndex={state.lastMoveIndex}
-          currentPlayer={state.currentPlayer}
-          isInteractive={boardInteractive}
-          onSelect={handleCellSelect}
-        />
-      </div>
-
-      <GameResult
-        status={state.status}
-        winner={state.winner}
-        mode={state.mode}
-        humanSymbol={state.humanSymbol}
-        roundNumber={state.roundNumber}
-        mySymbol={state.onlineSymbol}
-        endedWithoutWinner={endedWithoutWinner}
+        isInteractive={boardInteractive}
+        onSelect={handleCellSelect}
       />
     </section>
   )
@@ -436,101 +419,131 @@ export default function App() {
       />
 
       <div className="main-container">
+        <aside className="side-rail side-rail--left">
+          <RailSection title="Match statistics">
+            <MatchStats mode={state.mode} stats={state.stats} />
+          </RailSection>
+          <RailSection title="Recent rounds">
+            <MatchHistory history={state.history} mode={state.mode} />
+          </RailSection>
+        </aside>
+
         <main className="board-stage">
-            {!isOnline ? (
-              <ScoreBoard
-                mode={state.mode}
-                stats={state.stats}
-                humanSymbol={state.humanSymbol}
-                currentPlayer={state.currentPlayer}
+          {showBoard ? (
+            <div className="stage-status">
+              <GameResult
                 status={state.status}
+                winner={state.winner}
+                mode={state.mode}
+                humanSymbol={state.humanSymbol}
                 roundNumber={state.roundNumber}
-                completedRounds={state.stats[state.mode].rounds}
+                mySymbol={state.onlineSymbol}
+                endedWithoutWinner={endedWithoutWinner}
+              />
+              <TurnIndicator
+                mode={state.mode}
+                currentPlayer={state.currentPlayer}
+                humanSymbol={state.humanSymbol}
+                isThinking={thinking}
+                mySymbol={state.onlineSymbol}
+                waitingForOpponent={waitingForOpponent}
+              />
+            </div>
+          ) : null}
+
+          {isOnline && !onlineConfig.ok ? (
+            <OnlineSetupNotice message={onlineConfig.error} missing={onlineConfig.missing} />
+          ) : isOnline && !onlineRoomState ? (
+            <OnlineLobby
+              displayName={online.displayName}
+              onDisplayNameChange={online.setDisplayName}
+              busy={online.busy}
+              error={online.error}
+              inviteCode={inviteCode}
+              onCreate={() => void online.createRoom()}
+              onJoin={(code) => void online.joinRoom(code)}
+            />
+          ) : isOnline && waitingForOpponent ? (
+            <>
+              <OnlinePlayersBar
+                players={onlineRoomState?.players ?? []}
+                myUserId={online.userId}
+                mySymbol={online.mySymbol}
+                connection={online.connection}
+                opponentPresent={online.opponentPresent}
+                roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+              />
+              <OnlineWaitingRoom
+                roomCode={onlineRoomState?.room.joinCode ?? ''}
+                inviteLink={online.inviteLink}
+                busy={online.busy}
+                onLeave={() => void online.leaveRoom()}
+              />
+            </>
+          ) : isOnline ? (
+            <>
+              <OnlinePlayersBar
+                players={onlineRoomState?.players ?? []}
+                myUserId={online.userId}
+                mySymbol={online.mySymbol}
+                connection={online.connection}
+                opponentPresent={online.opponentPresent}
+                roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+              />
+              {boardPanel}
+            </>
+          ) : (
+            boardPanel
+          )}
+
+          {!isOnline ? (
+            <ScoreBoard
+              mode={state.mode}
+              stats={state.stats}
+              humanSymbol={state.humanSymbol}
+              currentPlayer={state.currentPlayer}
+              status={state.status}
+            />
+          ) : null}
+
+          <RoundControls
+            mode={state.mode}
+            onRestart={handleRestart}
+            onNewMatch={handleNewMatch}
+          >
+            {isOnline &&
+            onlineConfig.ok &&
+            onlineRoomState &&
+            onlineStatus !== 'waiting' ? (
+              <OnlineActions
+                busy={online.busy}
+                canRematch={onlineStatus === 'finished'}
+                iRequestedRematch={online.iRequestedRematch}
+                opponentRequestedRematch={online.opponentRequestedRematch}
+                onRequestRematch={() => void online.requestRematch()}
+                onLeave={() => void online.leaveRoom()}
               />
             ) : null}
+            {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl border border-rose/40 bg-rose/10 px-3 py-2 text-sm text-rose"
+              >
+                {online.error}
+              </p>
+            ) : null}
+          </RoundControls>
+        </main>
 
-            {isOnline && !onlineConfig.ok ? (
-              <OnlineSetupNotice message={onlineConfig.error} missing={onlineConfig.missing} />
-            ) : isOnline && !onlineRoomState ? (
-              <OnlineLobby
-                displayName={online.displayName}
-                onDisplayNameChange={online.setDisplayName}
-                busy={online.busy}
-                error={online.error}
-                inviteCode={inviteCode}
-                onCreate={() => void online.createRoom()}
-                onJoin={(code) => void online.joinRoom(code)}
-              />
-            ) : isOnline && waitingForOpponent ? (
-              <>
-                <OnlinePlayersBar
-                  players={onlineRoomState?.players ?? []}
-                  myUserId={online.userId}
-                  mySymbol={online.mySymbol}
-                  connection={online.connection}
-                  opponentPresent={online.opponentPresent}
-                  roundNumber={onlineRoomState?.room.roundNumber ?? 1}
-                />
-                <OnlineWaitingRoom
-                  roomCode={onlineRoomState?.room.joinCode ?? ''}
-                  inviteLink={online.inviteLink}
-                  busy={online.busy}
-                  onLeave={() => void online.leaveRoom()}
-                />
-              </>
-            ) : isOnline ? (
-              <>
-                <OnlinePlayersBar
-                  players={onlineRoomState?.players ?? []}
-                  myUserId={online.userId}
-                  mySymbol={online.mySymbol}
-                  connection={online.connection}
-                  opponentPresent={online.opponentPresent}
-                  roundNumber={onlineRoomState?.room.roundNumber ?? 1}
-                />
-                {boardPanel}
-              </>
-            ) : (
-              boardPanel
-            )}
-
-            <GameControls
-              mode={state.mode}
-              difficulty={state.difficulty}
-              boardSize={boardSize}
-              onDifficultyChange={handleDifficultyChange}
-              onBoardSizeChange={handleBoardSizeChange}
-              onRestart={handleRestart}
-              onNewMatch={handleNewMatch}
-            >
-              {isOnline &&
-              onlineConfig.ok &&
-              onlineRoomState &&
-              onlineStatus !== 'waiting' ? (
-                <OnlineActions
-                  busy={online.busy}
-                  canRematch={onlineStatus === 'finished'}
-                  iRequestedRematch={online.iRequestedRematch}
-                  opponentRequestedRematch={online.opponentRequestedRematch}
-                  onRequestRematch={() => void online.requestRematch()}
-                  onLeave={() => void online.leaveRoom()}
-                />
-              ) : null}
-              {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
-                <p
-                  role="alert"
-                  className="mt-3 rounded-xl border border-rose/40 bg-rose/10 px-3 py-2 text-sm text-rose"
-                >
-                  {online.error}
-                </p>
-              ) : null}
-            </GameControls>
-          </main>
-
-          <aside className="side-rail">
-            <MatchStats mode={state.mode} stats={state.stats} />
-            <MatchHistory history={state.history} mode={state.mode} />
-          </aside>
+        <aside className="side-rail side-rail--right">
+          <SettingsCards
+            mode={state.mode}
+            difficulty={state.difficulty}
+            boardSize={boardSize}
+            onDifficultyChange={handleDifficultyChange}
+            onBoardSizeChange={handleBoardSizeChange}
+          />
+        </aside>
       </div>
 
       <footer className="shrink-0 border-t border-white/5 px-4 py-3 text-center text-[12px] leading-relaxed text-muted">

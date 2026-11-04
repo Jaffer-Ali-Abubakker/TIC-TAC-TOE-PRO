@@ -5,9 +5,9 @@ import { MAX_DIMENSION, MIN_DIMENSION, normaliseBoardSize } from '../game/gameLo
 import type { BoardSize, Difficulty, GameMode } from '../game/types'
 
 const DIFFICULTY_OPTIONS = [
-  { value: 'easy' as const, label: 'Easy', hint: 'The computer plays randomly' },
-  { value: 'medium' as const, label: 'Medium', hint: 'The computer blocks and takes easy wins' },
-  { value: 'hard' as const, label: 'Hard', hint: 'The computer plays optimally and never loses' },
+  { value: 'easy' as const, label: 'Easy', hint: 'Plays random legal moves' },
+  { value: 'medium' as const, label: 'Medium', hint: 'Blocks wins, prefers the centre' },
+  { value: 'hard' as const, label: 'Hard', hint: 'Optimal play - never loses on 3x3' },
 ]
 
 const PRESET_SIZES = [3, 4, 5, 6, 7, 8]
@@ -18,33 +18,31 @@ const SIZE_OPTIONS: { value: string; label: string; hint?: string }[] = [
   { value: 'custom', label: 'More…', hint: 'Pick any rows and columns from 3 to 10' },
 ]
 
-export interface GameControlsProps {
+export interface SettingsCardsProps {
   mode: GameMode
   difficulty: Difficulty
   boardSize: BoardSize
   onDifficultyChange: (difficulty: Difficulty) => void
   onBoardSizeChange: (rows: number, cols: number) => void
-  onRestart: () => void
-  onNewMatch: () => void
-  /** Replaces the local round controls (used by the online mode). */
-  children?: ReactNode
 }
 
-export function GameControls({
+/**
+ * The two settings groups. They share one card on a phone (the container does
+ * it in CSS) and become separate cards in the desktop side rail.
+ */
+export function SettingsCards({
   mode,
   difficulty,
   boardSize,
   onDifficultyChange,
   onBoardSizeChange,
-  onRestart,
-  onNewMatch,
-  children,
-}: GameControlsProps) {
+}: SettingsCardsProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const { rows, cols, winLength } = boardSize
 
   const isPreset = rows === cols && rows >= MIN_DIMENSION && rows <= LARGEST_PRESET
   const selected = customOpen || !isPreset ? 'custom' : `${cols}x${cols}`
+  const activeHint = DIFFICULTY_OPTIONS.find((option) => option.value === difficulty)?.hint ?? ''
 
   const handleSizeChange = (value: string) => {
     if (value === 'custom') {
@@ -57,26 +55,30 @@ export function GameControls({
   }
 
   return (
-    <section className="panel p-4" aria-label="Game controls">
+    <div className="settings-group">
       {mode === 'pvc' ? (
-        <SegmentedControl
-          label="Computer difficulty"
-          name="ai-difficulty"
-          value={difficulty}
-          options={DIFFICULTY_OPTIONS}
-          onChange={onDifficultyChange}
-        />
+        <section className="settings-card" aria-label="Computer difficulty">
+          <SegmentedControl
+            label="Computer difficulty"
+            name="ai-difficulty"
+            value={difficulty}
+            options={DIFFICULTY_OPTIONS}
+            onChange={onDifficultyChange}
+            className="scroll-tabs"
+          />
+          <p className="settings-hint">{activeHint}</p>
+        </section>
       ) : null}
 
       {mode !== 'online' ? (
-        <div className="mt-4">
+        <section className="settings-card" aria-label="Board size">
           <SegmentedControl
             label="Board size"
             name="board-size"
             value={selected}
             options={SIZE_OPTIONS}
             onChange={handleSizeChange}
-            className="board-size-fieldset"
+            className="board-size-fieldset scroll-tabs"
           />
 
           {selected === 'custom' ? (
@@ -101,13 +103,39 @@ export function GameControls({
             {rows}×{cols} • {winLength} to win
             {normaliseBoardSize(rows, cols) === null ? ' • Max 100 cells' : ''}
           </p>
-        </div>
+        </section>
       ) : null}
 
+      <p className="rail-note">
+        <Gauge className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          {mode === 'pvc'
+            ? 'Hard difficulty uses minimax search and can never lose against an optimal opponent.'
+            : mode === 'pvp'
+              ? 'Two players share this device. X always starts a new round.'
+              : 'Online matches are hosted by the database. Every move is validated on the server.'}
+        </span>
+      </p>
+    </div>
+  )
+}
+
+export interface RoundControlsProps {
+  mode: GameMode
+  onRestart: () => void
+  onNewMatch: () => void
+  /** Replaces the local round controls (used by the online mode). */
+  children?: ReactNode
+}
+
+/** Restart / new match, or the online room actions. */
+export function RoundControls({ mode, onRestart, onNewMatch, children }: RoundControlsProps) {
+  return (
+    <div className="stage-actions">
       {children}
 
       {mode !== 'online' ? (
-        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={onRestart} className="btn btn-secondary w-full">
             <RotateCcw className="size-4" aria-hidden="true" />
             Restart round
@@ -118,18 +146,7 @@ export function GameControls({
           </button>
         </div>
       ) : null}
-
-      <p className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-muted">
-        <Gauge className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <span>
-          {mode === 'pvc'
-            ? 'Hard difficulty uses minimax search and can never lose against an optimal opponent.'
-            : mode === 'pvp'
-              ? 'Two players share this device. X always starts a new round.'
-              : 'Online matches are hosted by the database. Every move is validated on the server.'}
-        </span>
-      </p>
-    </section>
+    </div>
   )
 }
 

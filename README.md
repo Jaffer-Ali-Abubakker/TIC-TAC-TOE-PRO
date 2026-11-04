@@ -670,15 +670,19 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 
 - Mobile first, from a **320 px** viewport upwards - there is no horizontal
   overflow at 320 px in any of the three modes.
-- The cells are always square. The board is capped at `min(23rem, 100%, 58dvh)`
-  on the classic grid and grows a little (`26rem`, then `28rem`) as the grid
+- The cells are always square. The board is capped at `min(30rem, 100%, 50dvh)`
+  on the classic grid and grows a little (`32rem`, then `34rem`) as the grid
   gets bigger, so a 10×10 board still fits on a phone: no horizontal overflow,
   and the page keeps scrolling vertically.
-- Controls wrap instead of scrolling, dialogs are capped at
-  `calc(100dvh - 1.5rem)` and scroll internally.
+- One column on a phone, in game order: **board → round/turn → score →
+  restart/new match → difficulty and board size → match statistics → recent
+  rounds**. The two records panels are collapsed behind their own toggle there.
+- Three columns from 1024 px (records · board · difficulty and board size), each
+  scrolling on its own so the board never drifts off screen.
+- The difficulty and board-size pills scroll sideways on a phone instead of
+  stacking, so both groups stay in one card.
+- Dialogs are capped at `calc(100dvh - 1.5rem)` and scroll internally.
 - Safe areas are respected via `env(safe-area-inset-bottom)`.
-- Desktop uses a two column layout; the board stays the primary focus and the
-  statistics and history move into a sidebar.
 
 ## Project structure
 
@@ -722,11 +726,12 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     │   ├── Dialog.tsx             # Reusable accessible modal dialog
     │   ├── GameBoard.tsx          # Any rows x cols board, roving tab index, arrow keys
     │   ├── GameCell.tsx           # A single accessible board cell
-    │   ├── GameControls.tsx       # Mode, difficulty, restart, new match
+    │   ├── GameControls.tsx       # Settings cards (difficulty, board size) + round actions
     │   ├── GameHeader.tsx         # Brand, mode indicator, sound and settings
     │   ├── GameResult.tsx         # Round outcome banner (live region)
     │   ├── MatchHistory.tsx       # Recent completed rounds
     │   ├── MatchStats.tsx         # Per-mode statistics
+    │   ├── RailSection.tsx        # Records panel (collapsible on a phone)
     │   ├── ScoreBoard.tsx         # Current match score
     │   ├── SegmentedControl.tsx   # Radio group styled as a segmented control
     │   ├── SettingsDialog.tsx     # Preferences and statistics reset

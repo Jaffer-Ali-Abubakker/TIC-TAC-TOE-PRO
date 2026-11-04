@@ -40,7 +40,7 @@ Everything below was actually executed in this workspace, not merely planned.
 | Tests | `npm run test:run` | ✅ **276 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (304 kB JS / 94 kB gzip + a 214 kB lazy Supabase chunk, 38 kB CSS) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (305 kB JS / 95 kB gzip + a 214 kB lazy Supabase chunk, 39 kB CSS) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
@@ -67,9 +67,9 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | Two player mode | `src/game/gameReducer.ts` (`mode: 'pvp'`) | `src/App.test.tsx` "two player mode" |
 | Board size 3×3 … 10×10 | `src/game/gameLogic.ts` (`getWinLength`, `generateWinLines`, `normaliseBoardSize`), `src/components/GameControls.tsx` | `gameLogic.test.ts` "dynamic board sizes", `gameReducer.test.ts` "setBoardSize", `App.test.tsx` "board size" |
 | Online multiplayer | `src/online/*`, `src/components/online/*` | `src/online/*.test.ts`, `src/App.online.test.tsx` |
-| AI difficulty choice | `src/components/GameControls.tsx`, `SettingsDialog.tsx` | `src/App.test.tsx` |
+| AI difficulty choice | `SettingsCards` in `src/components/GameControls.tsx`, `SettingsDialog.tsx` | `src/App.test.tsx` |
 | Score + statistics | `src/components/ScoreBoard.tsx`, `MatchStats.tsx` | `src/App.test.tsx`, `src/game/gameReducer.test.ts` |
-| Restart round / new match | `src/components/GameControls.tsx` + `ConfirmDialog.tsx` | `src/App.test.tsx` "round and match management" |
+| Restart round / new match | `RoundControls` in `src/components/GameControls.tsx` + `ConfirmDialog.tsx` | `src/App.test.tsx` "round and match management" |
 | Local persistence | `src/utils/storage.ts`, `src/hooks/usePersistentState.ts` | `src/utils/storage.test.ts`, `src/App.test.tsx` |
 | Versioned storage schema | `src/utils/storage.ts` (v1 → v2 → v3 migrations) | `src/utils/storage.test.ts` |
 | Polished animations / a11y | `src/styles/index.css`, `src/components/*` | `src/App.test.tsx` "accessibility" |
@@ -214,12 +214,12 @@ Node **22.13+** is the practical requirement.
 share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 `OnlineActions.tsx` (rematch + leave) · `OnlineSetupNotice.tsx` ("not configured").
 
-### `src/components/` — the local UI (14 components, all presentational)
+### `src/components/` — the local UI (15 components, all presentational)
 
 `Dialog.tsx` · `ConfirmDialog.tsx` · `SettingsDialog.tsx` · `GameHeader.tsx` ·
-`GameBoard.tsx` · `GameCell.tsx` · `GameControls.tsx` · `SegmentedControl.tsx` ·
-`Toggle.tsx` · `ScoreBoard.tsx` · `MatchStats.tsx` · `MatchHistory.tsx` ·
-`GameResult.tsx` · `TurnIndicator.tsx`.
+`GameBoard.tsx` · `GameCell.tsx` · `GameControls.tsx` (`SettingsCards` and `RoundControls`) ·
+`RailSection.tsx` · `SegmentedControl.tsx` · `Toggle.tsx` · `ScoreBoard.tsx` ·
+`MatchStats.tsx` · `MatchHistory.tsx` · `GameResult.tsx` · `TurnIndicator.tsx`.
 
 ### `src/utils/`, `src/hooks/`, `src/test/`
 
@@ -507,6 +507,17 @@ regression.
 34. **Board cells are square by construction, not by a container `aspect-ratio`.** `.board-container`
     has no `aspect-ratio`; the cells keep `aspect-ratio: 1/1` and the grid rows size to their
     content. A container ratio would break on non-square grids (3×10) and make cells unequal.
+35. **The phone order comes from `display: contents`, not from a second DOM.** Below 1024 px
+    `.board-stage` and both `.side-rail`s are flattened so their children become flex items of
+    `.main-container`, and `.stage-*` / `.settings-group` / `.rail-section` carry the `order`.
+    Duplicating the markup per breakpoint would double every `data-testid` and break the tests;
+    adding a new block to the stage therefore means giving it an `order` (or leaving it at 0, which
+    puts it above the board — that is how the online lobby stays first).
+36. **A `fieldset` defaults to `min-inline-size: min-content`.** The pills row inside a settings
+    card therefore refused to shrink and pushed the page 17 px wide at 375 px. `.scroll-tabs`
+    sets `min-width: 0`. For the same reason `.segmented-option` is `position: relative`: the
+    `sr-only` radio was positioned against the page and extended `scrollWidth` past the scroller.
+    After any layout change, check `document.documentElement.scrollWidth === clientWidth`.
 
 ---
 
@@ -565,22 +576,32 @@ Rules that must be preserved:
   top/bottom mask on a scrolling list and nothing else. Do not set `scrollbar-width` outside the
   Firefox-only `@supports not selector(::-webkit-scrollbar)` block — it makes Chrome ignore the
   `::-webkit-scrollbar` rules, including the arrow-button kill.
-- Default (phones, short windows): stacked, normally scrolling layout.
+- Default (phones, short windows): one column, normally scrolling layout. `.main-container`,
+  `.board-stage` and both `.side-rail`s are flex columns; below 1024 px the two rails are
+  `display: contents`, so their children become direct children of the column and a single
+  `order` list decides the page order: board (1) → status row (2) → score (3) → actions (4) →
+  settings card (5) → statistics (6) → history (6, same order, DOM order breaks the tie).
 - The header wraps: brand and the sound/settings buttons on the first row, the mode switcher on
   its own full-width row below 640 px (the pills drop their icons there so they stay on one line).
+- From 1024 px `.main-container` is a grid `280px minmax(0, 1fr) 320px` (240/1fr/272 below
+  1280 px): records left, board stage centre, difficulty + board size right. The settings group
+  is `display: contents` there, so its two `.settings-card` sections become separate rail cards;
+  on a phone the group itself is the single card. Max width 90rem.
 - Viewport-fit (`@media (min-width: 1024px) and (min-height: 600px)`):
   - `.app-shell` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
   - Header is one compact bar (64px): brand left, mode switcher middle, buttons right.
-  - `.main-container` is `flex: 1`, `min-height: 0`, `flex-direction: row`: board stage
-    (`flex: 1 1 auto`, `max-width: 34rem`) and side rail (`flex: 0 0 20rem`).
-  - `.board-stage` scrolls internally (`overflow-y: auto`); `.side-rail` scrolls internally
-    (`overflow-y: auto`); the page never scrolls.
-  - Board container: `width: min(23rem, 100%, calc(58dvh * cols / rows))`, growing to `26rem`
-    (`data-density='tight'`, 5–6 lines) and `28rem` (`dense`, 7–10 lines). No container
+  - `.main-container` is `flex: 1`, `min-height: 0`; `.board-stage` and both `.side-rail`s scroll
+    internally (`overflow-y: auto`); the page never scrolls.
+  - Board container: `width: min(30rem, 100%, calc(50dvh * cols / rows))`, growing to `32rem`
+    (`data-density='tight'`, 5–6 lines) and `34rem` (`dense`, 7–10 lines). No container
     `aspect-ratio`: the cells are `aspect-ratio: 1/1` and the rows size to them, so cells stay
     square on every grid. The container writes `--board-cols` / `--board-rows`, and the grid uses
     `grid-template-columns: repeat(var(--board-cols), minmax(0, 1fr))`.
-- Online and waiting-room cards are centred in the stage column; they scroll internally
+- Cards use `--radius-card` (1.25rem / 20 px).
+- Below 1024 px the difficulty and board-size pill rows scroll sideways (`.scroll-tabs`), and the
+  two records panels collapse behind a `.rail-toggle` button (`RailSection`). The toggle is
+  `display: none` from 1024 px, where both panels are always open.
+- Online and waiting-room cards sit in the stage column; they scroll internally
   when the window is too short.
 - Dialogs: `width: min(32rem, 100vw - 1.5rem)`, `max-height: calc(100dvh - 1.5rem)`,
   `overflow-y: auto`.
@@ -1015,6 +1036,24 @@ the expected version.
 - 31 new tests (276 total). Verified with Playwright at 1400 px and 320 px: a 10×10 board is 100
   square cells, `clientWidth === scrollWidth` at 320 px, and a five-mark diagonal win draws the
   overlay correctly.
+
+**Phase 6 — game-first layout (TIC-003)**
+
+- `App.tsx` restructured into a three-column grid from 1024 px (records · board · settings) and
+  one ordered column below it, via `display: contents` on the rails (trap 35). The board is now
+  the hero: `min(30rem, 100%, 50dvh · cols / rows)` — 450 px at 1400×900 instead of 368 px.
+- `GameControls.tsx` split into `SettingsCards` (difficulty + board size, one card on a phone and
+  two cards in the desktop rail) and `RoundControls` (restart / new match, or the online room
+  actions) under the score. New `RailSection` collapses the statistics and history panels behind
+  a toggle below 1024 px.
+- The round/result banner and the turn pill share one `.stage-status` row above the board on
+  desktop and below it on a phone; `ScoreBoard` lost its duplicate "Round N" footer and took the
+  stage width.
+- Difficulty pill hints are shown as text (`settings-hint`), not only as a `title`, so they work
+  on touch. The pill rows scroll sideways on a phone (`.scroll-tabs`).
+- Design tokens: `--radius-card` is 20 px. Layout verified with Playwright at 1400, 1280, 1024,
+  375 and 320 px: 280/704/320 columns at 1400 px, 450 px board, 10×10 = 100 square cells with a
+  4 px gap, `scrollWidth === clientWidth` at 320 px (314/314), and the 3×3 win overlay unchanged.
 
 ---
 

@@ -7,8 +7,6 @@ export interface ScoreBoardProps {
   humanSymbol: Player
   currentPlayer: Player
   status: GameStatus
-  roundNumber: number
-  completedRounds: number
 }
 
 interface Tile {
@@ -25,8 +23,6 @@ export function ScoreBoard({
   humanSymbol,
   currentPlayer,
   status,
-  roundNumber,
-  completedRounds,
 }: ScoreBoardProps) {
   const computerSymbol: Player = humanSymbol === 'X' ? 'O' : 'X'
 
@@ -50,7 +46,7 @@ export function ScoreBoard({
           ]
 
   return (
-    <section aria-label="Current match score">
+    <section className="stage-score" aria-label="Current match score">
       <div className="score-board">
         {tiles.map((tile) => {
           const Icon = tile.icon
@@ -79,13 +75,6 @@ export function ScoreBoard({
           )
         })}
       </div>
-
-      <p className="mt-3 flex items-center justify-between font-mono text-[11px] uppercase tracking-widest text-muted">
-        <span>Round {roundNumber}</span>
-        <span>
-          {completedRounds} {completedRounds === 1 ? 'round' : 'rounds'} played
-        </span>
-      </p>
     </section>
   )
 }
