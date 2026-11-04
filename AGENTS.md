@@ -40,11 +40,11 @@ Everything below was actually executed in this workspace, not merely planned.
 | Tests | `npm run test:run` | ✅ **276 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (300 kB JS / 93 kB gzip + a 214 kB lazy Supabase chunk) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (304 kB JS / 94 kB gzip + a 214 kB lazy Supabase chunk, 38 kB CSS) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
-| Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs |
-| Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 320 / scrollWidth 320` — none, in every mode |
+| Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
+| Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 314 / scrollWidth 314` on a 320 px viewport — none, in every mode and on 3×3 / 4×4 / 10×10 |
 | Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 2 migrations recorded |
 | Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
 | **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
@@ -71,11 +71,11 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | Score + statistics | `src/components/ScoreBoard.tsx`, `MatchStats.tsx` | `src/App.test.tsx`, `src/game/gameReducer.test.ts` |
 | Restart round / new match | `src/components/GameControls.tsx` + `ConfirmDialog.tsx` | `src/App.test.tsx` "round and match management" |
 | Local persistence | `src/utils/storage.ts`, `src/hooks/usePersistentState.ts` | `src/utils/storage.test.ts`, `src/App.test.tsx` |
-| Versioned storage schema | `src/utils/storage.ts` (v1 → v2 migration) | `src/utils/storage.test.ts` |
+| Versioned storage schema | `src/utils/storage.ts` (v1 → v2 → v3 migrations) | `src/utils/storage.test.ts` |
 | Polished animations / a11y | `src/styles/index.css`, `src/components/*` | `src/App.test.tsx` "accessibility" |
-| All 8 win lines + draws | `src/game/gameLogic.ts` | `src/game/gameLogic.test.ts` |
+| All win lines + draws | generated per board shape in `src/game/gameLogic.ts` | `src/game/gameLogic.test.ts` |
 | Easy / Medium / Hard AI | `src/game/ai.ts` | `src/game/ai.test.ts` |
-| Hard never loses | minimax + exhaustive DFS | `src/game/ai.test.ts` "never loses in any legal reachable game" |
+| Hard never loses | minimax + exhaustive DFS (3×3 only) | `src/game/ai.test.ts` "never loses in any legal reachable game" |
 | Score exactly once per round | single reducer transition | `src/game/gameReducer.test.ts` "scoring" |
 | Authoritative server moves | `public.submit_online_move` | `supabase/tests/online_multiplayer.test.ts` |
 | Atomic / concurrency safe | `FOR UPDATE` + version CAS | `supabase/tests/online_multiplayer.test.ts` |
@@ -555,8 +555,9 @@ Rules that must be preserved:
   `@layer`, so a utility on the same element (`.btn` + `size-10` + `px-0`) loses. Use the
   `.btn-icon` class for square icon buttons instead of overriding padding with utilities.
 - The winning line is an **absolutely positioned** child of `.board-grid` with a `grid-area`
-  from `WINNING_LINES`. Do not make it a normal grid item: a definite grid placement is resolved
-  before auto-placement, so a static line would push the nine cells down one row.
+  computed by `describeLine` from the first and last winning index (any board shape). Do not make
+  it a normal grid item: a definite grid placement is resolved before auto-placement, so a static
+  line would push the cells down one row.
 - `body` and `.app-shell` both have `overflow-x: hidden`.
 - Scrollbars are themed once, globally: 6 px page thumb in lime, 4 px panel thumb
   (`.arcade-scroll`, plus `.side-rail` / `.board-stage`) that turns lime → cyan while the pointer
@@ -905,7 +906,8 @@ npm run build        # succeeds
 ```
 
 Plus, for anything user-visible: a headless-Chrome screenshot at desktop **and** 320 px, with
-`scrollWidth === clientWidth` confirmed for the narrow viewport.
+`scrollWidth === clientWidth` confirmed for the narrow viewport. For the board, check the classic
+3×3 **and** the extreme 10×10 (square cells, winning line overlay, controls still reachable).
 
 If you touch the database, also run:
 

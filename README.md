@@ -492,19 +492,23 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 245 tests in 14 files:
+The suite has 276 tests in 14 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
-  immutability.
-- **AI** (`src/game/ai.test.ts`) - easy/medium/hard behaviour, and an
-  exhaustive proof that the hard AI never loses in any legally reachable game.
+  immutability, and the dynamic board sizes (the win length table, the 3-10 / 100
+  cell limits, generated lines, row/column/diagonal wins on 4×4 and 10×10, and
+  that four in a row is not enough on a 10×10 board).
+- **AI** (`src/game/ai.test.ts`) - easy/medium/hard behaviour, an exhaustive
+  proof that the hard AI never loses on 3×3 in any legally reachable game, and
+  the big-board behaviour (a 10×10 answer in under half a second, completing and
+  blocking five in a row).
 - **Reducer** (`src/game/gameReducer.test.ts`) - turn alternation, scoring
   exactly once, per-mode score books, round/match flows, the online snapshot
   path (including the version guard that stops an out-of-order event from
-  rolling the board back).
-- **Storage** (`src/utils/storage.test.ts`) - schema validation, the v1 to v2
-  migration, corrupted JSON, blocked `localStorage`.
+  rolling the board back) and the board size changes.
+- **Storage** (`src/utils/storage.test.ts`) - schema validation, the v1 to v2 to
+  v3 migrations, a persisted board size, corrupted JSON, blocked `localStorage`.
 - **Sound** (`src/utils/sound.test.ts`) - Web Audio behaviour and failure
   tolerance.
 - **Online module** (`src/online/*.test.ts`) - room codes, invite links,
