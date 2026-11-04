@@ -421,8 +421,8 @@ html {
  * Board
  * ------------------------------------------------------------------ */
 .board-container {
-  width: min(23rem, 100%, 50dvh);
-  aspect-ratio: 1 / 1;
+  /* Classic board keeps its exact previous size; bigger grids earn more room. */
+  width: min(23rem, 100%, calc(58dvh * var(--board-cols, 3) / var(--board-rows, 3)));
   margin: 0 auto;
   padding: 0.75rem;
   border: 1px solid var(--color-border);
@@ -434,11 +434,38 @@ html {
 .board-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(var(--board-cols, 3), minmax(0, 1fr));
   gap: 0.75rem;
   width: 100%;
-  height: 100%;
+}
+
+/* Bigger boards: tighter gaps, smaller radius, thinner and dimmer marks. */
+.board-container[data-density='tight'] {
+  width: min(26rem, 100%, calc(58dvh * var(--board-cols, 3) / var(--board-rows, 3)));
+  padding: 0.625rem;
+  border-radius: 1.5rem;
+}
+
+.board-container[data-density='dense'] {
+  width: min(28rem, 100%, calc(58dvh * var(--board-cols, 3) / var(--board-rows, 3)));
+  padding: 0.5rem;
+  border-radius: 1rem;
+}
+
+.board-container[data-density='tight'] .board-grid {
+  gap: 0.5rem;
+}
+
+.board-container[data-density='dense'] .board-grid {
+  gap: 0.25rem;
+}
+
+.board-container[data-density='tight'] .cell-button {
+  border-radius: 0.75rem;
+}
+
+.board-container[data-density='dense'] .cell-button {
+  border-radius: 0.375rem;
 }
 
 @media (max-width: 420px) {
@@ -497,6 +524,16 @@ html {
   transition: opacity 0.15s ease;
 }
 
+.board-container[data-density='tight'] .mark-x,
+.board-container[data-density='tight'] .mark-o {
+  width: 44%;
+}
+
+.board-container[data-density='dense'] .mark-x,
+.board-container[data-density='dense'] .mark-o {
+  width: 36%;
+}
+
 .mark-x {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -530,6 +567,29 @@ html {
   box-shadow:
     0 0 20px rgba(0, 245, 255, 0.5),
     inset 0 0 20px rgba(0, 245, 255, 0.2);
+}
+
+.board-container[data-density='tight'] .mark-x::before,
+.board-container[data-density='tight'] .mark-x::after {
+  height: 5px;
+}
+
+.board-container[data-density='tight'] .mark-o {
+  border-width: 5px;
+}
+
+/* 7x7 and up: the glow has to shrink with the cell or it bleeds into the grid. */
+.board-container[data-density='dense'] .mark-x::before,
+.board-container[data-density='dense'] .mark-x::after {
+  height: 3px;
+  box-shadow: 0 0 8px rgba(204, 255, 0, 0.5);
+}
+
+.board-container[data-density='dense'] .mark-o {
+  border-width: 3px;
+  box-shadow:
+    0 0 8px rgba(0, 245, 255, 0.45),
+    inset 0 0 8px rgba(0, 245, 255, 0.2);
 }
 
 /* ------------------------------------------------------------------ *
@@ -794,6 +854,89 @@ html {
 .segmented-option:has(input:focus-visible) {
   outline: 2px solid var(--color-lime);
   outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Board size picker
+ * ------------------------------------------------------------------ */
+.board-size-fieldset .segmented-option[data-selected='true'] {
+  border-color: transparent;
+  background: var(--color-lime);
+  color: var(--color-void);
+}
+
+.board-size-custom {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.board-size-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.board-size-stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.board-size-step {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.board-size-step:hover:not(:disabled) {
+  border-color: var(--color-lime);
+  color: var(--color-lime);
+}
+
+.board-size-step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.board-size-value {
+  min-width: 2.5rem;
+  padding: 0.3125rem 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-card);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.board-size-times {
+  padding-bottom: 0.4375rem;
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+
+.board-size-badge {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
 }
 
 /* ------------------------------------------------------------------ *

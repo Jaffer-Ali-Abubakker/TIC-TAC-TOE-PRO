@@ -6,11 +6,12 @@ export interface MatchHistoryProps {
   mode: GameMode
 }
 
-function MiniBoard({ board }: { board: Cell[] }) {
+function MiniBoard({ board, cols }: { board: Cell[]; cols: number }) {
   return (
     <span
       aria-hidden="true"
-      className="grid size-10 shrink-0 grid-cols-3 gap-[2px] rounded-sm border border-border bg-card p-[3px]"
+      className="grid size-10 shrink-0 gap-[2px] rounded-sm border border-border bg-card p-[3px]"
+      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
     >
       {board.map((cell, index) => (
         <span
@@ -69,7 +70,7 @@ export function MatchHistory({ history, mode }: MatchHistoryProps) {
                 data-testid="history-entry"
                 className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
               >
-                <MiniBoard board={entry.board} />
+                <MiniBoard board={entry.board} cols={entry.cols} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium text-text">
                     Round {entry.round} - {resultLabel}

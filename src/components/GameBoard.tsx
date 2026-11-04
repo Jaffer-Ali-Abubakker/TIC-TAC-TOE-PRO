@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { GameCell } from './GameCell'
 import type { Board, Player } from '../game/types'
 
 export interface GameBoardProps {
   board: Board
+  rows: number
+  cols: number
   winningCombination: number[] | null
   lastMoveIndex: number | null
   currentPlayer: Player
@@ -20,28 +22,37 @@ const ARROW_DELTAS: Record<string, { row: number; column: number }> = {
 }
 
 /**
- * The winning line is positioned inside its own grid area, so the browser does
- * the geometry: no measurement, no resize listener.
+ * The winning line is positioned inside the grid area spanned by the winning
+ * cells, so the browser does the geometry: no measurement, no resize listener.
  */
-const WINNING_LINES: Record<string, { area: string; kind: 'h' | 'v' | 'diag' | 'diag-inv' }> = {
-  '0,1,2': { area: '1 / 1 / 2 / 4', kind: 'h' },
-  '3,4,5': { area: '2 / 1 / 3 / 4', kind: 'h' },
-  '6,7,8': { area: '3 / 1 / 4 / 4', kind: 'h' },
-  '0,3,6': { area: '1 / 1 / 4 / 2', kind: 'v' },
-  '1,4,7': { area: '1 / 2 / 4 / 3', kind: 'v' },
-  '2,5,8': { area: '1 / 3 / 4 / 4', kind: 'v' },
-  '0,4,8': { area: '1 / 1 / 4 / 4', kind: 'diag' },
-  '2,4,6': { area: '1 / 1 / 4 / 4', kind: 'diag-inv' },
+function describeLine(combination: number[], cols: number): { area: string; kind: string } {
+  const first = combination[0]
+  const last = combination[combination.length - 1]
+  const startRow = Math.floor(first / cols)
+  const startCol = first % cols
+  const endRow = Math.floor(last / cols)
+  const endCol = last % cols
+
+  const area = `${Math.min(startRow, endRow) + 1} / ${Math.min(startCol, endCol) + 1} / ${
+    Math.max(startRow, endRow) + 2
+  } / ${Math.max(startCol, endCol) + 2}`
+
+  if (startRow === endRow) return { area, kind: 'h' }
+  if (startCol === endCol) return { area, kind: 'v' }
+  const falling = endRow - startRow === endCol - startCol
+  return { area, kind: falling ? 'diag' : 'diag-inv' }
 }
 
 /**
- * The 3x3 board.
+ * The board, for any `rows x cols` shape.
  *
  * Uses a roving tab index so the whole board is a single tab stop and the
  * arrow keys move the focus between cells.
  */
 export function GameBoard({
   board,
+  rows,
+  cols,
   winningCombination,
   lastMoveIndex,
   currentPlayer,
@@ -62,28 +73,37 @@ export function GameBoard({
       if (!delta) return
       event.preventDefault()
 
-      const row = Math.floor(index / 3) + delta.row
-      const column = (index % 3) + delta.column
-      if (row < 0 || row > 2 || column < 0 || column > 2) return
+      const row = Math.floor(index / cols) + delta.row
+      const column = (index % cols) + delta.column
+      if (row < 0 || row >= rows || column < 0 || column >= cols) return
 
-      focusCell(row * 3 + column)
+      focusCell(row * cols + column)
     },
-    [focusCell],
+    [cols, rows, focusCell],
   )
 
   const winning = winningCombination ?? []
-  const line = winning.length === 3 ? WINNING_LINES[[...winning].sort().join(',')] : undefined
+  const line = winning.length > 0 ? describeLine(winning, cols) : null
+
+  // Big boards need tighter gaps, thinner marks and a smaller radius, or the
+  // grid looks like a wall of pills.
+  const span = Math.max(rows, cols)
+  const density = span <= 4 ? 'cozy' : span <= 6 ? 'tight' : 'dense'
 
   return (
-    <div className="board-container">
+    <div
+      className="board-container"
+      data-density={density}
+      style={{ '--board-cols': cols, '--board-rows': rows } as CSSProperties}
+    >
       <div ref={containerRef} role="group" aria-label="Game board" className="board-grid">
         {board.map((value, index) => (
           <GameCell
             key={index}
             index={index}
             value={value}
-            row={Math.floor(index / 3)}
-            column={index % 3}
+            row={Math.floor(index / cols)}
+            column={index % cols}
             isWinning={winning.includes(index)}
             isLastMove={lastMoveIndex === index}
             isDisabled={!isInteractive || value !== null}

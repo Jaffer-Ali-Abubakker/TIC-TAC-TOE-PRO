@@ -57,6 +57,8 @@ not the browser - decides whether a move is legal.
 
 - Player vs Computer with an easy, medium and unbeatable hard AI.
 - Two players on the same device.
+- Board sizes from 3×3 up to 10×10 (100 cells), chosen from presets or with
+  custom rows and columns.
 - Scoreboard, per-mode statistics and a 20-entry match history.
 - Restart round, new match, settings dialog and optional sound effects.
 - Everything persists in `localStorage`.
@@ -664,8 +666,10 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 
 - Mobile first, from a **320 px** viewport upwards - there is no horizontal
   overflow at 320 px in any of the three modes.
-- The board is always square: `max-w-[min(92vw,26rem)] md:max-w-[min(92vw,30rem)]`
-  with `aspect-square` cells, so all nine cells stay easy to tap.
+- The cells are always square. The board is capped at `min(23rem, 100%, 58dvh)`
+  on the classic grid and grows a little (`26rem`, then `28rem`) as the grid
+  gets bigger, so a 10×10 board still fits on a phone: no horizontal overflow,
+  and the page keeps scrolling vertically.
 - Controls wrap instead of scrolling, dialogs are capped at
   `calc(100dvh - 1.5rem)` and scroll internally.
 - Safe areas are respected via `env(safe-area-inset-bottom)`.
@@ -712,7 +716,7 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     ├── components/
     │   ├── ConfirmDialog.tsx      # Destructive action confirmation
     │   ├── Dialog.tsx             # Reusable accessible modal dialog
-    │   ├── GameBoard.tsx          # 3x3 board, roving tab index, arrow keys
+    │   ├── GameBoard.tsx          # Any rows x cols board, roving tab index, arrow keys
     │   ├── GameCell.tsx           # A single accessible board cell
     │   ├── GameControls.tsx       # Mode, difficulty, restart, new match
     │   ├── GameHeader.tsx         # Brand, mode indicator, sound and settings
@@ -759,28 +763,51 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 
 ## Game rules
 
-Standard Tic-Tac-Toe:
+Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
 
-- The board has nine cells, each holding `X`, `O` or nothing.
+- Every cell holds `X`, `O` or nothing. A board is `rows × cols` cells; the
+  limits are 3 to 10 per side and 100 cells in total.
 - `X` always moves first in a new round. In the online mode the creator of a
   room is X; in a rematch the symbols alternate.
 - Players alternate and may only select empty cells.
 - A finished round never accepts another move.
-- A player wins by occupying three cells in a row, a column or a diagonal:
+- The number of marks needed to win depends on the board:
+
+  | Board | Marks in a line |
+  | --- | --- |
+  | 3×3 | 3 |
+  | 4×4 up to 7×7 | 4 |
+  | 8×8 up to 10×10 | 5 |
+
+  Formally `getWinLength(rows, cols)`: `3` for 3×3, `4` when both sides are at
+  most 7, otherwise `5`.
+- A win is any straight line (row, column or diagonal) of at least that many
+  marks. On the 3×3 board these are exactly the classic eight:
   - rows: `0-1-2`, `3-4-5`, `6-7-8`
   - columns: `0-3-6`, `1-4-7`, `2-5-8`
   - diagonals: `0-4-8`, `2-4-6`
-- If all nine cells are taken and nobody has a line, the round is a draw.
+- If every cell is taken and nobody has a line, the round is a draw.
 - A win always takes precedence over a full board.
+- Changing the board size starts a fresh round (after a confirmation when a
+  round is in progress) and keeps the scores and the history.
+- The **online mode is 3×3 only**, so the database schema does not have to carry
+  a variable board.
 
 ## AI difficulty levels
 
 - **Easy** - picks a uniformly random legal cell.
 - **Medium** - takes an immediate win, otherwise blocks an immediate opponent
-  win, otherwise prefers the center, then a corner, then any legal cell.
-- **Hard** - minimax with memoisation. It never loses against an optimal
-  opponent, prefers faster wins and slower losses, and breaks ties between
-  equally optimal moves pseudo-randomly.
+  win, otherwise prefers the centre, then a corner, then any legal cell.
+- **Hard** - adapts to the board:
+  - **3×3** - full minimax with memoisation. It never loses against an optimal
+    opponent, prefers faster wins and slower losses, and breaks ties between
+    equally optimal moves pseudo-randomly.
+  - **4×4** (and other boards of at most 16 cells) - minimax capped at four
+    plies, then a line heuristic.
+  - **5×5 and up** - the line heuristic only: take an immediate win, block an
+    immediate loss, otherwise maximise the value of the lines the move
+    improves, with a nudge towards the centre. A 10×10 move is answered in a
+    few milliseconds instead of freezing the page.
 
 ## Accessibility
 
@@ -824,6 +851,7 @@ Standard Tic-Tac-Toe:
   profile of each player.
 - Online statistics are stored **locally per browser**. They are not
   synchronised between devices and are not global.
-- The hard AI search is specific to the 3x3 board.
+- The hard AI is only *unbeatable* on 3×3. On bigger boards it searches four
+  plies (4×4) or plays a line heuristic (5×5 and up), so a strong human can win.
 - Sound effects use the Web Audio API. Some browsers block audio until the
   first interaction; the game is unaffected and simply stays silent.

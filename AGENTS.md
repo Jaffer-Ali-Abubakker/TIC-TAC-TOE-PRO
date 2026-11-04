@@ -37,7 +37,7 @@ Everything below was actually executed in this workspace, not merely planned.
 | --- | --- | --- |
 | Types | `npm run typecheck` | ✅ passes, 0 errors |
 | Lint | `npm run lint` | ✅ passes, 0 problems |
-| Tests | `npm run test:run` | ✅ **245 tests / 14 files, all passing** |
+| Tests | `npm run test:run` | ✅ **276 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
 | Build | `npm run build` | ✅ succeeds → `dist/` (300 kB JS / 93 kB gzip + a 214 kB lazy Supabase chunk) |
@@ -65,6 +65,7 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | --- | --- | --- |
 | Player vs computer | `src/App.tsx` (AI scheduling), `src/game/ai.ts` | `src/App.test.tsx`, `src/game/ai.test.ts` |
 | Two player mode | `src/game/gameReducer.ts` (`mode: 'pvp'`) | `src/App.test.tsx` "two player mode" |
+| Board size 3×3 … 10×10 | `src/game/gameLogic.ts` (`getWinLength`, `generateWinLines`, `normaliseBoardSize`), `src/components/GameControls.tsx` | `gameLogic.test.ts` "dynamic board sizes", `gameReducer.test.ts` "setBoardSize", `App.test.tsx` "board size" |
 | Online multiplayer | `src/online/*`, `src/components/online/*` | `src/online/*.test.ts`, `src/App.online.test.tsx` |
 | AI difficulty choice | `src/components/GameControls.tsx`, `SettingsDialog.tsx` | `src/App.test.tsx` |
 | Score + statistics | `src/components/ScoreBoard.tsx`, `MatchStats.tsx` | `src/App.test.tsx`, `src/game/gameReducer.test.ts` |
@@ -190,10 +191,10 @@ Node **22.13+** is the practical requirement.
 
 | File | Responsibility |
 | --- | --- |
-| `types.ts` | `Player`, `Cell`, `Board`, `GameMode` (`pvc`/`pvp`/`online`), `Difficulty`, `GameStatus`, `RoundResult`, `Stats` (`PvcStats`/`PvpStats`/`OnlineStats`), `HistoryEntry`, `opponentOf()`. |
-| `gameLogic.ts` | The rules engine. `BOARD_SIZE=9`, `WINNING_COMBINATIONS` (8 lines), `createInitialBoard`, `getWinner`, `getWinningCombination`, `isBoardFull`, `getGameStatus`, `getAvailableMoves`, `isValidIndex`, `makeMove` (throws `InvalidMoveError` with a `code`), `canPlayAt`, `boardKey`, `CENTER_INDEX`, `CORNER_INDICES`. Pure, never mutates. |
-| `ai.ts` | `chooseMove(board, player, difficulty, random?)` → index or `null`. `chooseEasyMove`, `chooseMediumMove`, `chooseHardMove`, `minimax`, `findImmediateWin`, `evaluatePosition`. Randomness is **injected**. Memoisation cache keyed `boardKey|aiPlayer|playerToMove|depth`. |
-| `gameReducer.ts` | `GameState`, `GameAction`, `gameReducer`, `createInitialGameState`, the `applyOnlineState` action, and the selectors `getPlayerLabel`, `getComputerSymbol`, `isComputerTurn`, `hasActiveRound`. Contains the **only** place where scores/history are mutated. |
+| `types.ts` | `Player`, `Cell`, `Board` (a flat `rows * cols` array), `BoardSize` (`rows`, `cols`, `winLength`), `GameMode` (`pvc`/`pvp`/`online`), `Difficulty`, `GameStatus`, `RoundResult`, `Stats` (`PvcStats`/`PvpStats`/`OnlineStats`), `HistoryEntry` (carries its own `rows`/`cols` so the history can redraw a 4×4 final position), `opponentOf()`. |
+| `gameLogic.ts` | The rules engine. `BOARD_SIZE=9`, `THREE_BY_THREE`, `MIN_DIMENSION=3`, `MAX_DIMENSION=10`, `MAX_CELLS=100`, `getWinLength(rows, cols)`, `generateWinLines(rows, cols, winLength)` + the cached `getWinLines(size)`, `normaliseBoardSize` (the only place the limits live), `WINNING_COMBINATIONS` (the classic eight), `createInitialBoard(size?)`, `getWinner`, `getWinningCombination`, `isBoardFull`, `getGameStatus`, `getAvailableMoves`, `isValidIndex`, `makeMove` (throws `InvalidMoveError` with a `code`), `canPlayAt`, `boardKey`, `CENTER_INDEX`, `CORNER_INDICES`. Pure, never mutates. The `size` parameter defaults to 3×3 for the classic call sites. |
+| `ai.ts` | `chooseMove(board, player, difficulty, random?, size?)` → index or `null`. Adaptive: 3×3 = full minimax (unbeatable), boards of at most 16 cells = minimax capped at 4 plies, bigger = `chooseHeuristicMove` (`evaluateBoard` line heuristic). Also `chooseEasyMove`, `chooseMediumMove`, `chooseHardMove`, `minimax`, `findImmediateWin`, `evaluatePosition`. Randomness is **injected**. Memoisation cache keyed `rows×cols×winLength|boardKey|aiPlayer|playerToMove|depth|limit`. |
+| `gameReducer.ts` | `GameState`, `GameAction` (including `setBoardSize`), `gameReducer`, `createInitialGameState`, the `applyOnlineState` action, and the selectors `getPlayerLabel`, `getComputerSymbol`, `isComputerTurn`, `hasActiveRound`. Contains the **only** place where scores/history are mutated. |
 
 ### `src/online/` — the online module
 
@@ -224,7 +225,7 @@ share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 
 | File | Responsibility |
 | --- | --- |
-| `utils/storage.ts` | Versioned persistence. `STORAGE_KEY`, `STORAGE_VERSION = 2`, `MAX_HISTORY_ENTRIES = 20`, `validatePersistedState`, `migratePersistedState` (v1 → v2), `loadPersistedState` / `savePersistedState` / `clearPersistedState` (never throw), `isStorageAvailable()`. |
+| `utils/storage.ts` | Versioned persistence. `STORAGE_KEY`, `STORAGE_VERSION = 3`, `MAX_HISTORY_ENTRIES = 20`, `validatePersistedState`, `migratePersistedState` (v1 → v2 → v3; v3 adds `boardSize`, default 3×3), `loadPersistedState` / `savePersistedState` / `clearPersistedState` (never throw), `isStorageAvailable()`. |
 | `utils/sound.ts` | Web Audio effects (`move`, `win`, `lose`, `draw`), lazy `AudioContext`, `resume()`, every failure swallowed. |
 | `utils/clipboard.ts` | `copyToClipboard` (Clipboard API → `execCommand` fallback), `shareOrCopy` (Web Share API → clipboard fallback). |
 | `hooks/usePersistentState.ts` | Reads synchronously on mount, de-duplicates writes by serialised signature, probes storage availability once. |
@@ -266,15 +267,20 @@ pinned by `skills-lock.json`. See §15 for when **not** to use them.
 
 ### Board & rules
 
-- 9 cells, values `X` | `O` | `null`. Board is `readonly Cell[]`.
+- A board is `rows × cols` cells, flat, left to right then top to bottom. Values `X` | `O` | `null`.
+  Limits: 3–10 per side **and** at most 100 cells (`normaliseBoardSize` is the only place these live).
+- `winLength = getWinLength(rows, cols)`: **3** on 3×3, **4** when both sides are ≤ 7, otherwise **5**.
+  Win lines are generated by `generateWinLines` and cached per shape (`getWinLines`).
 - **X always moves first.** In `pvc` mode, if the human plays **O**, the computer (X) therefore
   opens the round. In the online mode the room creator is X.
 - A player may only select an **empty** cell.
-- Winning lines: rows `0-1-2, 3-4-5, 6-7-8`; columns `0-3-6, 1-4-7, 2-5-8`;
-  diagonals `0-4-8, 2-4-6`.
+- A win is any row, column or diagonal of `winLength` marks. On 3×3 those are exactly the classic
+  eight: rows `0-1-2, 3-4-5, 6-7-8`; columns `0-3-6, 1-4-7, 2-5-8`; diagonals `0-4-8, 2-4-6`.
 - `getGameStatus` order is **win first, then full board**. A full board with a line is a *win*,
   never a draw. A round can never be both.
 - A finished round rejects every further move — this is what makes double scoring impossible.
+- **The online mode is 3×3 only.** Entering it forces `boardSize` back to 3×3, so the server
+  payload (always nine cells) and the local grid can never disagree.
 
 ### Scoring policy (documented, implemented, tested)
 
@@ -312,7 +318,20 @@ pinned by `skills-lock.json`. See §15 for when **not** to use them.
 | --- | --- |
 | **Easy** | Uniformly random legal cell. |
 | **Medium** | 1) take an immediate win → 2) block an immediate opponent win → 3) centre → 4) a corner → 5) random legal cell. |
-| **Hard** | Minimax, memoised. Win `WIN_SCORE - depth` (10−depth), loss `LOSS_SCORE + depth` (−10+depth), draw `0`. Ties broken pseudo-randomly. |
+| **Hard** | Adaptive by board shape (see below). Ties broken pseudo-randomly. |
+
+**Hard is adaptive** because full minimax on 100 cells would freeze the page:
+
+| Board | Search | Guarantee |
+| --- | --- | --- |
+| 3×3 | Full minimax, memoised | **Unbeatable** (enforced by the exhaustive DFS test) |
+| ≤ 16 cells (e.g. 4×4) | Minimax capped at 4 plies, then the line heuristic | Strong, not proven optimal |
+| 5×5 and up (e.g. 10×10) | `chooseHeuristicMove`: win → block → `evaluateBoard` line score + centre bonus | A few ms per move, beatable |
+
+Minimax scoring is unchanged: win `WIN_SCORE - depth` (10−depth), loss `LOSS_SCORE + depth`
+(−10+depth), draw `0`. At the depth horizon it returns `evaluateBoard(...) / 1000`, so a real win
+(≥ 6) always outranks any heuristic value (max ≈ 0.2). `evaluateBoard` scores each line that is
+free of opponent marks by the square of the player's mark count.
 
 ---
 
@@ -325,6 +344,7 @@ mode            'pvc' | 'pvp' | 'online'
 difficulty      'easy' | 'medium' | 'hard'
 humanSymbol     'X' | 'O'          // which symbol the human controls in pvc
 soundEnabled    boolean
+boardSize       BoardSize         // { rows, cols, winLength } - board.length is always rows*cols
 board           Board
 currentPlayer   Player
 status          'playing' | 'won' | 'draw'
@@ -341,7 +361,7 @@ onlineVersion   number             // version of the last applied snapshot
 onlineCountedRound number           // round whose outcome was already counted
 ```
 
-`GameAction` union: `playMove` · `applyOnlineState` · `newRound` · `newMatch` ·
+`GameAction` union: `playMove` · `applyOnlineState` · `setBoardSize` · `newRound` · `newMatch` ·
 `setMode` · `setDifficulty` · `setHumanSymbol` · `setSoundEnabled` · `resetStats`.
 
 ### Invariants you must not break
@@ -353,8 +373,10 @@ onlineCountedRound number           // round whose outcome was already counted
    `playing → terminal` branch of `playMove` or from `applyOnlineState`. Do not add score updates
    anywhere else.
 3. **`roundId` increments on every new round** (`newRound`, `newMatch`, `setMode`,
-   `setHumanSymbol`). It is the cancellation token for asynchronous computer moves.
-4. **`setMode` and `setHumanSymbol` always start a fresh round.**
+   `setBoardSize`, `setHumanSymbol`). It is the cancellation token for asynchronous computer moves.
+4. **`setMode`, `setBoardSize` and `setHumanSymbol` always start a fresh round.**
+   `setBoardSize` rejects anything `normaliseBoardSize` refuses, keeps the scores and the history,
+   and is a no-op for the size that is already set.
 5. **The computer reply is protected twice**: the effect cleanup clears the `setTimeout` when the
    board/round changes, *and* the dispatched `playMove` carries the `roundId` it was scheduled for.
 6. **`applyOnlineState` ignores any snapshot whose `version` is older** than `onlineVersion`.
@@ -363,6 +385,10 @@ onlineCountedRound number           // round whose outcome was already counted
    `snapshot.roundNumber > onlineCountedRound`.
 8. **The client never decides legality.** `submitOnlineMove` is the only thing that changes an
    online board.
+9. **`state.board.length` always equals `state.boardSize.rows * state.boardSize.cols`.** Every
+   board-producing transition either calls `createInitialBoard(state.boardSize)`, passes
+   `state.boardSize` to `makeMove`, or (online) takes the server snapshot after forcing
+   `boardSize` to 3×3. Never resize `board` without resizing `boardSize`.
 
 ### The online controller (`useOnlineRoom`)
 
@@ -467,6 +493,20 @@ regression.
 30. **A deployment can serve a completely different project.** Two Vercel projects in different
     scopes can both be called `tic-tac-toe-pro`; the older one keeps the clean domain. Always
     check the `<title>` and the asset paths of the deployed site before debugging the app.
+31. **The `size` parameter of the rules engine defaults to 3×3.** A 9 cell board is always read as
+    3×3 and a length check cannot tell 3×4 from 4×3, so a caller that forgets to pass the real size
+    silently checks the wrong lines. Every production caller passes `state.boardSize`; the default
+    exists only so the classic call sites and tests stay short. If you add a caller, pass the size.
+32. **`getWinLines` must stay cached.** `generateWinLines` inside `getGameStatus` would rebuild up
+    to 192 lines per node and turn the AI quadratic. The cache is keyed `rowsxcolsxwinLength`.
+33. **The winning line needs no per-size table.** `describeLine` in `GameBoard` derives the
+    `grid-area` from the first and last winning indexes (min/max of row and column), which
+    reproduces the old hardcoded 3×3 areas exactly (`1 / 1 / 2 / 4` for a row, `1 / 3 / 4 / 4` for
+    a column, `1 / 1 / 4 / 4` for both diagonals) and works for any line length. Do not reintroduce
+    a `WINNING_LINES` map.
+34. **Board cells are square by construction, not by a container `aspect-ratio`.** `.board-container`
+    has no `aspect-ratio`; the cells keep `aspect-ratio: 1/1` and the grid rows size to their
+    content. A container ratio would break on non-square grids (3×10) and make cells unequal.
 
 ---
 
@@ -499,6 +539,8 @@ Reusable CSS classes defined by hand in the same file: `.scene`, `.scene-grid`, 
 `.mark-x`, `.mark-o`, `.winning-line`, `.turn-indicator`, `.score-board`, `.score-pill`,
 `.score-number`, `.score-label`, `.micro-label`, `.helper-text`, `.segmented-option`, `.btn`,
 `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-ghost-danger`, `.btn-icon`,
+`.board-size-fieldset`, `.board-size-custom`, `.board-size-stepper`, `.board-size-step`,
+`.board-size-value`, `.board-size-times`, `.board-size-badge`,
 `.result-banner`, `.result-title`, `.dialog-overlay`, `.dialog-panel`, `.waiting-card`, `.live-dot`,
 `.arcade-scroll`, `.scroll-fade`.
 
@@ -532,7 +574,11 @@ Rules that must be preserved:
     (`flex: 1 1 auto`, `max-width: 34rem`) and side rail (`flex: 0 0 20rem`).
   - `.board-stage` scrolls internally (`overflow-y: auto`); `.side-rail` scrolls internally
     (`overflow-y: auto`); the page never scrolls.
-  - Board container: `width: min(23rem, 100%, 50dvh)`, `aspect-ratio: 1`, square cells.
+  - Board container: `width: min(23rem, 100%, calc(58dvh * cols / rows))`, growing to `26rem`
+    (`data-density='tight'`, 5–6 lines) and `28rem` (`dense`, 7–10 lines). No container
+    `aspect-ratio`: the cells are `aspect-ratio: 1/1` and the rows size to them, so cells stay
+    square on every grid. The container writes `--board-cols` / `--board-rows`, and the grid uses
+    `grid-template-columns: repeat(var(--board-cols), minmax(0, 1fr))`.
 - Online and waiting-room cards are centred in the stage column; they scroll internally
   when the window is too short.
 - Dialogs: `width: min(32rem, 100vw - 1.5rem)`, `max-height: calc(100dvh - 1.5rem)`,
@@ -558,21 +604,21 @@ Rules that must be preserved:
 
 ## 13. Testing strategy
 
-245 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
+276 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
 after each test and polyfills `matchMedia` / `scrollTo`.
 
 | Suite | Focus |
 | --- | --- |
-| `src/game/gameLogic.test.ts` | All winning lines for both symbols, draw detection, win-beats-full-board, invalid indices, occupied cells, moves after win/draw, immutability. |
-| `src/game/ai.test.ts` | Easy always legal; medium wins / blocks / centre / corner; hard wins forced wins, avoids forced losses, **is optimal in every reachable position**, **never loses as X and never loses as O**, works with either symbol, returns `null` for finished games. |
-| `src/game/gameReducer.test.ts` | Turn alternation, rejections, scoring exactly once, per-mode score books, history capped at 20, round/match/mode/symbol flows, the online snapshot path and its version guard. |
-| `src/utils/storage.test.ts` | Validation, field repair, the v1 → v2 migration, corrupted JSON, blocked `localStorage`. |
+| `src/game/gameLogic.test.ts` | All winning lines for both symbols, draw detection, win-beats-full-board, invalid indices, occupied cells, moves after win/draw, immutability. Plus "dynamic board sizes": the win length table, the size limits, generated lines for 3×3/4×4, row/column/diagonal wins on 4×4 and 10×10, "four in a row is not enough on a 10×10", a 4×4 draw and out-of-range moves on a 16 cell board. |
+| `src/game/ai.test.ts` | Easy always legal; medium wins / blocks / centre / corner; hard wins forced wins, avoids forced losses, **is optimal in every reachable position**, **never loses as X and never loses as O**, works with either symbol, returns `null` for finished games. Plus "big boards": a 10×10 move under 500 ms, completing and blocking five in a row on 10×10, a forced win on 4×4, a legal move for every difficulty on 4×4 and `null` on a finished board. |
+| `src/game/gameReducer.test.ts` | Turn alternation, rejections, scoring exactly once, per-mode score books, history capped at 20, round/match/mode/symbol flows, the online snapshot path and its version guard. Plus `setBoardSize`: fresh 16 cell round with the scores kept, rejected 2×3 / 11×11, same-size no-op, scoring a 4×4 round, no false win at three marks on 5×5, and the online mode forcing 3×3. |
+| `src/utils/storage.test.ts` | Validation, field repair, the v1 → v2 → v3 migrations, a persisted board size (and its repair), the shape of a big board history entry, corrupted JSON, blocked `localStorage`. |
 | `src/utils/sound.test.ts` | Oscillator creation, multi-tone win/draw, no-throw when the API is missing or the context fails. |
 | `src/online/roomCode.test.ts` | Code normalisation and validation, formatting, invite link build/parse, display name sanitising, move id format. |
 | `src/online/config.test.ts` | Missing variables, malformed URLs, valid configuration, the app URL fallback. |
 | `src/online/onlineApi.test.ts` | Payload validation, the `online:<code>` → friendly message mapping, the exact RPC arguments, error conversion. |
 | `src/online/useOnlineRoom.test.tsx` | Create / join / leave, invalid codes, friendly errors, move submission with the right version, **move id reuse on retry**, the turn guard, the version guard, the realtime subscription, refresh on a realtime event, subscription cleanup. |
-| `src/App.test.tsx` | The local modes end to end. |
+| `src/App.test.tsx` | The local modes end to end, including the board size pills (preset switch + persistence), the "Change board size?" confirmation with the confirm and the `Escape` cancel path, and the custom rows/columns steppers. |
 | `src/App.online.test.tsx` | The online lobby, room creation, joining by code, invite links, the setup notice, rematch and the connection status. |
 | `supabase/tests/online_multiplayer.test.ts` | The **real migration** on a real PostgreSQL engine: unauthenticated rejection, seat allocation, the third player, a non-member, direct writes, illegal moves, idempotency, win/draw detection, rematch, leaving, the expiry sweep. |
 | `supabase/tests/online_multiplayer_sql.test.ts` | Runs the SQL editor script from start to finish and checks that it cleans up. |
@@ -818,6 +864,10 @@ Useful CDP domains: `Network` (request/response URLs and bodies), `Runtime.conso
 - **Anonymous sessions are device/browser specific.** Clearing site data or losing the session
   means a new identity — the old seat cannot be reclaimed, and the room expires. There is no
   impersonation: a returning player with a new session simply cannot take the old seat.
+- The hard AI is only **unbeatable on 3×3**. On boards up to 16 cells it searches four plies, and
+  on 5×5 and up it plays a line heuristic, so a strong human can beat it. Full minimax on a 10×10
+  board is not feasible in a browser.
+- The online mode is 3×3 only; the board size picker is hidden there.
 - Realtime presence is best effort and is never used to award a win.
 - The client polls every 2.5 s as a fallback when realtime is unavailable.
 - Rooms expire after two hours; `online_expire_rooms()` must be scheduled (see the README).
@@ -941,6 +991,29 @@ the expected version.
   contain` on the rails, and a `.scroll-fade` mask on the history list.
 - Updated §11 design-system docs and this changelog entry.
 
+**Phase 5 — dynamic board size (TIC-002)**
+
+- `BoardSize` (`rows`, `cols`, `winLength`) added to `GameState`, the persisted payload (storage
+  v3, v1/v2 payloads migrate with a 3×3 default) and `HistoryEntry` (so the history redraws a 4×4
+  final position as 4×4).
+- Deleted the hardcoded `WINNING_COMBINATIONS` win check: `getWinLength(rows, cols)` and
+  `generateWinLines(rows, cols, winLength)` produce the lines for any grid, cached per shape.
+  `normaliseBoardSize` is the single gate for the 3–10 / 100 cell limits.
+- New `setBoardSize` action: validated, starts a fresh round, keeps the scores and the history,
+  and bumps `roundId` so a pending computer move can never land on the new board. The online mode
+  forces 3×3.
+- The AI is now adaptive (full minimax on 3×3, four plies up to 16 cells, a line heuristic above
+  that) so a 10×10 move answers in a few milliseconds.
+- `GameBoard` takes `rows`/`cols`, derives the winning line `grid-area` from the winning indexes
+  (any line length, any diagonal) and switches gap/radius/mark size/glow with a
+  `data-density` attribute.
+- "Board size" section in `GameControls` (preset pills 3×3…8×8 plus "More…" with rows/columns
+  steppers and a `8×8 • 4 to win` badge), a confirmation before discarding a round in progress,
+  and "Online supports 3×3 only." in the lobby.
+- 31 new tests (276 total). Verified with Playwright at 1400 px and 320 px: a 10×10 board is 100
+  square cells, `clientWidth === scrollWidth` at 320 px, and a five-mark diagonal win draws the
+  overlay correctly.
+
 ---
 
 ## 21. What is still unverified
@@ -969,6 +1042,6 @@ The exact steps are in the README under *Online multiplayer setup*.
 
 ---
 
-*Last verified: 2026-10-30 — Windows 11, Node v22.23.2, npm 10.9.8.
-245/245 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
+*Last verified: 2026-11-04 — Windows 11, Node v22.23.2, npm 10.9.8.
+276/276 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
 lint clean · production build clean.*

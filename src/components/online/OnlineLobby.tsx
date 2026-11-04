@@ -64,6 +64,7 @@ export function OnlineLobby({
         <p className="helper-text mt-2">
           A name is only a label for your opponent. It is not an account and it grants no rights.
         </p>
+        <p className="helper-text mt-2">Online supports 3×3 only.</p>
       </div>
 
       {inviteCode ? (

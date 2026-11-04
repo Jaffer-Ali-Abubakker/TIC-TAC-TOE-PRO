@@ -24,7 +24,8 @@ import {
   type GameState,
 } from './game/gameReducer'
 import { chooseMove } from './game/ai'
-import type { Difficulty, GameMode, Player } from './game/types'
+import { createInitialBoard, normaliseBoardSize } from './game/gameLogic'
+import type { BoardSize, Difficulty, GameMode, Player } from './game/types'
 import { playSound } from './utils/sound'
 import {
   STORAGE_VERSION,
@@ -57,6 +58,8 @@ function initGameState(persisted: PersistedState): GameState {
     difficulty: persisted.difficulty,
     humanSymbol: persisted.humanSymbol,
     soundEnabled: persisted.soundEnabled,
+    boardSize: persisted.boardSize,
+    board: createInitialBoard(persisted.boardSize),
     stats: persisted.stats,
     history: persisted.history,
   }
@@ -85,7 +88,7 @@ export default function App() {
 
   const computerSymbol = getComputerSymbol(state)
   const thinking = isComputerTurn(state)
-  const { roundId, board, difficulty } = state
+  const { roundId, board, difficulty, boardSize } = state
 
   /* ---------------------------------------------------------------- *
    * Persistence
@@ -97,6 +100,7 @@ export default function App() {
       difficulty: state.difficulty,
       humanSymbol: state.humanSymbol,
       soundEnabled: state.soundEnabled,
+      boardSize: state.boardSize,
       stats: state.stats,
       history: state.history,
     }),
@@ -105,6 +109,7 @@ export default function App() {
       state.difficulty,
       state.humanSymbol,
       state.soundEnabled,
+      state.boardSize,
       state.stats,
       state.history,
     ],
@@ -123,7 +128,7 @@ export default function App() {
     const player = computerSymbol
 
     const timer = window.setTimeout(() => {
-      const index = chooseMove(board, player, difficulty)
+      const index = chooseMove(board, player, difficulty, Math.random, boardSize)
       if (index === null) return
       // The round id guard makes sure a stale reply can never touch a newer
       // round (for example after a restart or a mode change).
@@ -131,7 +136,7 @@ export default function App() {
     }, AI_THINK_DELAY_MS)
 
     return () => window.clearTimeout(timer)
-  }, [thinking, board, difficulty, computerSymbol, roundId])
+  }, [thinking, board, difficulty, computerSymbol, roundId, boardSize])
 
   /* ---------------------------------------------------------------- *
    * Online mode
@@ -276,6 +281,27 @@ export default function App() {
     dispatch({ type: 'setHumanSymbol', symbol })
   }, [])
 
+  const handleBoardSizeChange = useCallback(
+    (rows: number, cols: number) => {
+      const size: BoardSize | null = normaliseBoardSize(rows, cols)
+      if (!size) return
+      if (size.rows === state.boardSize.rows && size.cols === state.boardSize.cols) return
+
+      const apply = () => dispatch({ type: 'setBoardSize', rows: size.rows, cols: size.cols })
+      if (hasActiveRound(state)) {
+        requestConfirm({
+          title: 'Change board size?',
+          description: `The round in progress will be discarded and a new ${size.rows}×${size.cols} round will start. The scores are kept.`,
+          confirmLabel: 'Change board size',
+          action: apply,
+        })
+        return
+      }
+      apply()
+    },
+    [state, requestConfirm],
+  )
+
   const handleSoundChange = useCallback((enabled: boolean) => {
     dispatch({ type: 'setSoundEnabled', enabled })
   }, [])
@@ -371,6 +397,8 @@ export default function App() {
       <div className="my-2">
         <GameBoard
           board={state.board}
+          rows={boardSize.rows}
+          cols={boardSize.cols}
           winningCombination={state.winningCombination}
           lastMoveIndex={state.lastMoveIndex}
           currentPlayer={state.currentPlayer}
@@ -469,7 +497,9 @@ export default function App() {
             <GameControls
               mode={state.mode}
               difficulty={state.difficulty}
+              boardSize={boardSize}
               onDifficultyChange={handleDifficultyChange}
+              onBoardSizeChange={handleBoardSizeChange}
               onRestart={handleRestart}
               onNewMatch={handleNewMatch}
             >

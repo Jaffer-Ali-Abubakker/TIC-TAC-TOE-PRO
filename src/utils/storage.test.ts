@@ -17,6 +17,7 @@ describe('validatePersistedState', () => {
       difficulty: 'hard' as const,
       humanSymbol: 'O' as const,
       soundEnabled: true,
+      boardSize: { rows: 4, cols: 4, winLength: 4 },
       stats: {
         pvc: { rounds: 3, playerWins: 2, computerWins: 1, draws: 0 },
         pvp: { rounds: 1, xWins: 1, oWins: 0, draws: 0 },
@@ -49,8 +50,37 @@ describe('validatePersistedState', () => {
     expect(migrated.stats.online).toEqual({ rounds: 0, xWins: 0, oWins: 0, draws: 0 })
   })
 
-  it('falls back to defaults for a completely invalid payload', () => {
-    expect(validatePersistedState(null)).toEqual(createDefaultPersistedState())
+  it('migrates a version 2 payload and defaults the board to 3x3', () => {
+    const migrated = validatePersistedState({
+      version: 2,
+      mode: 'pvc',
+      difficulty: 'medium',
+      humanSymbol: 'X',
+      soundEnabled: false,
+      stats: { pvc: { rounds: 1, playerWins: 1, computerWins: 0, draws: 0 } },
+      history: [],
+    })
+
+    expect(migrated.version).toBe(STORAGE_VERSION)
+    expect(migrated.boardSize).toEqual({ rows: 3, cols: 3, winLength: 3 })
+    expect(migrated.stats.pvc.playerWins).toBe(1)
+  })
+
+  it('keeps a persisted board size and repairs an impossible one', () => {
+    const kept = validatePersistedState({
+      ...createDefaultPersistedState(),
+      boardSize: { rows: 10, cols: 10, winLength: 5 },
+    })
+    expect(kept.boardSize).toEqual({ rows: 10, cols: 10, winLength: 5 })
+
+    const repaired = validatePersistedState({
+      ...createDefaultPersistedState(),
+      boardSize: { rows: 40, cols: 40, winLength: 9 },
+    })
+    expect(repaired.boardSize).toEqual({ rows: 3, cols: 3, winLength: 3 })
+  })
+
+  it('falls back to defaults for a completely invalid payload', () => {    expect(validatePersistedState(null)).toEqual(createDefaultPersistedState())
     expect(validatePersistedState('nope')).toEqual(createDefaultPersistedState())
     expect(validatePersistedState([])).toEqual(createDefaultPersistedState())
   })
@@ -100,6 +130,37 @@ describe('validatePersistedState', () => {
     })
     expect(repaired.history).toHaveLength(1)
     expect(repaired.history[0].id).toBe('a')
+  })
+
+  it('keeps the shape of a big board history entry', () => {
+    const repaired = validatePersistedState({
+      version: STORAGE_VERSION,
+      history: [
+        {
+          id: 'big',
+          round: 1,
+          mode: 'pvc',
+          result: 'X',
+          winnerLabel: 'You',
+          board: new Array(16).fill(null),
+          rows: 4,
+          cols: 4,
+          timestamp: 1,
+        },
+        {
+          id: 'legacy',
+          round: 2,
+          mode: 'pvc',
+          result: 'X',
+          winnerLabel: 'You',
+          board: new Array(9).fill(null),
+          timestamp: 2,
+        },
+      ],
+    })
+
+    expect(repaired.history.map((entry) => entry.rows)).toEqual([4, 3])
+    expect(repaired.history.map((entry) => entry.cols)).toEqual([4, 3])
   })
 })
 

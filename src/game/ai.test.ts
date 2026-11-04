@@ -15,8 +15,9 @@ import {
   getGameStatus,
   getWinner,
   makeMove,
+  normaliseBoardSize,
 } from './gameLogic'
-import type { Board, Cell, Player } from './types'
+import type { Board, BoardSize, Cell, Player } from './types'
 import { opponentOf } from './types'
 
 function boardWith(marks: Record<number, Player>): Board {
@@ -226,8 +227,7 @@ describe('hard difficulty', () => {
  * Plays every possible opponent reply against the hard AI and asserts that
  * the AI is never the loser.
  */
-function assertNeverLoses(aiPlayer: Player): void {
-  const seen = new Set<string>()
+function assertNeverLoses(aiPlayer: Player): void {  const seen = new Set<string>()
 
   const visit = (board: Board, playerToMove: Player) => {
     const key = `${boardKey(board)}|${playerToMove}`
@@ -256,3 +256,56 @@ function assertNeverLoses(aiPlayer: Player): void {
 
   visit(createInitialBoard(), 'X')
 }
+
+describe('big boards', () => {
+  const fourByFour = normaliseBoardSize(4, 4) as BoardSize
+  const tenByTen = normaliseBoardSize(10, 10) as BoardSize
+
+  function sizedBoard(size: BoardSize, marks: Record<number, Player> = {}): Board {
+    const board = createInitialBoard(size).slice() as Cell[]
+    for (const [index, player] of Object.entries(marks)) board[Number(index)] = player
+    return board
+  }
+
+  it('answers a 10x10 move in well under half a second', () => {
+    const board = sizedBoard(tenByTen)
+    const started = Date.now()
+    const move = chooseMove(board, 'X', 'hard', Math.random, tenByTen)
+    const elapsed = Date.now() - started
+
+    expect(move).not.toBeNull()
+    expect(board[move as number]).toBeNull()
+    expect(elapsed).toBeLessThan(500)
+  })
+
+  it('completes five in a row on a 10x10 board', () => {
+    const board = sizedBoard(tenByTen, { 40: 'O', 41: 'O', 42: 'O', 43: 'O', 50: 'X', 51: 'X' })
+    expect(chooseHardMove(board, 'O', Math.random, tenByTen)).toBe(44)
+  })
+
+  it('blocks five in a row on a 10x10 board', () => {
+    const board = sizedBoard(tenByTen, { 10: 'X', 11: 'X', 12: 'X', 13: 'X', 99: 'O' })
+    expect(chooseHardMove(board, 'O', Math.random, tenByTen)).toBe(14)
+  })
+
+  it('wins on a 4x4 board', () => {
+    const board = sizedBoard(fourByFour, { 0: 'O', 1: 'O', 2: 'O', 5: 'X', 6: 'X' })
+    expect(chooseHardMove(board, 'O', Math.random, fourByFour)).toBe(3)
+  })
+
+  it('returns a legal move for every difficulty on a 4x4 board', () => {
+    const board = sizedBoard(fourByFour, { 5: 'X', 10: 'O' })
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      const move = chooseMove(board, 'X', difficulty, Math.random, fourByFour)
+      expect(move).not.toBeNull()
+      expect(getAvailableMoves(board)).toContain(move)
+    }
+  })
+
+  it('returns null once a big board is finished', () => {
+    const board = sizedBoard(tenByTen, { 0: 'X', 11: 'X', 22: 'X', 33: 'X', 44: 'X' })
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      expect(chooseMove(board, 'O', difficulty, Math.random, tenByTen)).toBeNull()
+    }
+  })
+})
