@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { GameCell } from './GameCell'
 import type { Board, Player } from '../game/types'
 
@@ -20,6 +20,22 @@ const ARROW_DELTAS: Record<string, { row: number; column: number }> = {
   ArrowLeft: { row: 0, column: -1 },
   ArrowRight: { row: 0, column: 1 },
 }
+
+/**
+ * Eighteen confetti pieces thrown out of the winning line. Generated from the
+ * index (not `Math.random`) so a re-render never reshuffles a running burst.
+ */
+const CONFETTI = Array.from({ length: 18 }, (_, index) => {
+  const radians = ((index / 18) * 360 * Math.PI) / 180
+  const distance = 55 + ((index * 37) % 75)
+  return {
+    x: Math.round(Math.cos(radians) * distance),
+    y: Math.round(Math.sin(radians) * distance),
+    delay: (index % 6) * 40,
+    color: index % 3 === 0 ? 'var(--color-cyan)' : index % 3 === 1 ? 'var(--color-lime)' : 'var(--color-text)',
+    size: index % 4 === 0 ? 8 : 5,
+  }
+})
 
 /**
  * The winning line is positioned inside the grid area spanned by the winning
@@ -62,6 +78,19 @@ export function GameBoard({
   const [focusIndex, setFocusIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // 2px kick on the whole board for every placed mark. Driven by a class (not a
+  // keyframe on the moves) so the animation restarts on each new move.
+  const [shaking, setShaking] = useState(false)
+  const previousMove = useRef(lastMoveIndex)
+
+  useEffect(() => {
+    if (lastMoveIndex === previousMove.current) return
+    previousMove.current = lastMoveIndex
+    setShaking(true)
+    const timer = setTimeout(() => setShaking(false), 180)
+    return () => clearTimeout(timer)
+  }, [lastMoveIndex])
+
   const focusCell = useCallback((index: number) => {
     setFocusIndex(index)
     containerRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`)?.focus()
@@ -92,11 +121,17 @@ export function GameBoard({
 
   return (
     <div
-      className="board-container"
+      className={`board-container${shaking ? ' board-shake' : ''}`}
       data-density={density}
       style={{ '--board-cols': cols, '--board-rows': rows } as CSSProperties}
     >
-      <div ref={containerRef} role="group" aria-label="Game board" className="board-grid">
+      <div
+        ref={containerRef}
+        role="group"
+        aria-label="Game board"
+        data-turn={currentPlayer}
+        className="board-grid"
+      >
         {board.map((value, index) => (
           <GameCell
             key={index}
@@ -117,7 +152,23 @@ export function GameBoard({
             aria-hidden="true"
             className={`winning-line winning-line--${line.kind}`}
             style={{ gridArea: line.area }}
-          />
+          >
+            {CONFETTI.map((piece, index) => (
+              <span
+                key={index}
+                className="confetti-particle"
+                style={
+                  {
+                    '--x': `${piece.x}px`,
+                    '--y': `${piece.y}px`,
+                    '--delay': `${piece.delay}ms`,
+                    '--color': piece.color,
+                    '--size': `${piece.size}px`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
         ) : null}
       </div>
       <p className="sr-only">

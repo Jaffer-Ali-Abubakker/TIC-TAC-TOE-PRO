@@ -1,5 +1,7 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, Crown, Medal, User } from 'lucide-react'
 import type { GameMode, GameStatus, Player, Stats } from '../game/types'
+import { playSound } from '../utils/sound'
 
 export interface ScoreBoardProps {
   mode: GameMode
@@ -24,10 +26,10 @@ export function ScoreBoard({
   currentPlayer,
   status,
 }: ScoreBoardProps) {
-  const computerSymbol: Player = humanSymbol === 'X' ? 'O' : 'X'
-
-  const tiles: Tile[] =
-    mode === 'pvc'
+  // Memoised so the score-bump effect only re-runs when a number really changes.
+  const tiles = useMemo<Tile[]>(() => {
+    const computerSymbol: Player = humanSymbol === 'X' ? 'O' : 'X'
+    return mode === 'pvc'
       ? [
           { key: 'player', label: 'You', symbol: humanSymbol, value: stats.pvc.playerWins, icon: User },
           { key: 'draw', label: 'Draws', symbol: null, value: stats.pvc.draws, icon: Medal },
@@ -44,6 +46,24 @@ export function ScoreBoard({
             { key: 'draw', label: 'Draws', symbol: null, value: stats.pvp.draws, icon: Medal },
             { key: 'o', label: 'Player 2 (O)', symbol: 'O', value: stats.pvp.oWins, icon: User },
           ]
+  }, [mode, stats, humanSymbol])
+
+  const [bumped, setBumped] = useState<string | null>(null)
+  const previousValues = useRef(tiles.map((tile) => tile.value))
+
+  // A tile that just gained a point bounces, shows a floating "+1" and plays
+  // the score pop. Only an *increase* animates, so switching modes is silent.
+  useEffect(() => {
+    const values = tiles.map((tile) => tile.value)
+    const index = values.findIndex((value, position) => value > previousValues.current[position])
+    previousValues.current = values
+    if (index === -1) return
+
+    setBumped(tiles[index].key)
+    playSound('score')
+    const timer = setTimeout(() => setBumped(null), 800)
+    return () => clearTimeout(timer)
+  }, [tiles])
 
   return (
     <section className="stage-score" aria-label="Current match score">
@@ -51,11 +71,13 @@ export function ScoreBoard({
         {tiles.map((tile) => {
           const Icon = tile.icon
           const active = status === 'playing' && tile.symbol === currentPlayer
+          const isBumped = bumped === tile.key
           return (
             <div
               key={tile.key}
               data-testid={`score-${tile.key}`}
               data-active={active}
+              data-bumped={isBumped}
               data-player={tile.symbol ?? undefined}
               className="score-pill"
             >
@@ -70,6 +92,11 @@ export function ScoreBoard({
                 aria-hidden="true"
               />
               <span className="score-number">{tile.value}</span>
+              {isBumped ? (
+                <span className="score-bump" aria-hidden="true">
+                  +1
+                </span>
+              ) : null}
               <span className="score-label">{tile.label}</span>
             </div>
           )

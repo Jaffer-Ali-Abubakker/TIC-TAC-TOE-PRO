@@ -27,7 +27,7 @@ import {
 import { chooseMove } from './game/ai'
 import { createInitialBoard, normaliseBoardSize } from './game/gameLogic'
 import type { BoardSize, Difficulty, GameMode, Player } from './game/types'
-import { playSound } from './utils/sound'
+import { playSound, setSoundMuted } from './utils/sound'
 import {
   STORAGE_VERSION,
   createDefaultPersistedState,
@@ -181,6 +181,24 @@ export default function App() {
    * ---------------------------------------------------------------- */
   const lastSoundMoveRef = useRef(-1)
 
+  // One shared mute flag, so any component can play without prop plumbing.
+  useEffect(() => {
+    setSoundMuted(!state.soundEnabled)
+  }, [state.soundEnabled])
+
+  // Buttons click, cells do not (they have their own place sound).
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const button = target.closest('button, .segmented-option')
+      if (!button || button.classList.contains('cell-button')) return
+      playSound('click')
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   useEffect(() => {
     if (!state.soundEnabled) return
     if (state.movesPlayed === 0) return
@@ -197,7 +215,9 @@ export default function App() {
       playSound('draw')
       return
     }
-    playSound('move')
+
+    const placed = state.lastMoveIndex === null ? null : state.board[state.lastMoveIndex]
+    playSound(placed === 'O' ? 'placeO' : 'placeX')
   }, [
     state.soundEnabled,
     state.movesPlayed,
@@ -206,6 +226,8 @@ export default function App() {
     state.mode,
     state.humanSymbol,
     state.onlineSymbol,
+    state.board,
+    state.lastMoveIndex,
   ])
 
   /* ---------------------------------------------------------------- *
@@ -222,7 +244,10 @@ export default function App() {
         return
       }
       if (state.status !== 'playing') return
-      if (state.board[index] !== null) return
+      if (state.board[index] !== null) {
+        playSound('invalid')
+        return
+      }
 
       const player: Player = state.mode === 'pvp' ? state.currentPlayer : state.humanSymbol
       if (state.currentPlayer !== player) return
@@ -390,6 +415,7 @@ export default function App() {
   const boardPanel = (
     <section className="panel stage-board p-3 sm:p-4" aria-label="Game">
       <GameBoard
+        key={`${boardSize.rows}x${boardSize.cols}`}
         board={state.board}
         rows={boardSize.rows}
         cols={boardSize.cols}

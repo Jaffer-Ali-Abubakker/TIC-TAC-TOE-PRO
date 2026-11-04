@@ -1,5 +1,6 @@
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { Cell } from '../game/types'
+import { playSound } from '../utils/sound'
 
 export interface GameCellProps {
   index: number
@@ -34,6 +35,13 @@ export function GameCell({
 }: GameCellProps) {
   const state = isWinning ? 'winning' : value === null ? 'empty' : 'occupied'
 
+  const handlePointerEnter = (event: PointerEvent<HTMLButtonElement>) => {
+    // A tick only for a mouse that can actually place something; touch drags
+    // and the computer's own moves stay silent.
+    if (event.pointerType !== 'mouse' || isDisabled) return
+    playSound('hover')
+  }
+
   return (
     <button
       type="button"
@@ -41,11 +49,14 @@ export function GameCell({
       aria-label={`Row ${row + 1}, column ${column + 1}: ${describeCell(value, isWinning)}`}
       data-state={state}
       data-index={index}
+      data-last={isLastMove}
+      data-value={value ?? undefined}
       tabIndex={tabIndex}
       onClick={() => {
         if (isDisabled) return
         onSelect(index)
       }}
+      onPointerEnter={handlePointerEnter}
       onKeyDown={(event) => onKeyDown(index, event)}
       className="cell-button"
     >

@@ -37,7 +37,7 @@ Everything below was actually executed in this workspace, not merely planned.
 | --- | --- | --- |
 | Types | `npm run typecheck` | ✅ passes, 0 errors |
 | Lint | `npm run lint` | ✅ passes, 0 problems |
-| Tests | `npm run test:run` | ✅ **276 tests / 14 files, all passing** |
+| Tests | `npm run test:run` | ✅ **281 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
 | Build | `npm run build` | ✅ succeeds → `dist/` (305 kB JS / 95 kB gzip + a 214 kB lazy Supabase chunk, 39 kB CSS) |
@@ -86,6 +86,7 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | Reconnect recovery | `src/online/useOnlineRoom.ts` | `src/online/useOnlineRoom.test.tsx` |
 | Missing config does not break offline play | `src/online/config.ts` | `src/App.online.test.tsx` "missing configuration" |
 | Sound toggle (Web Audio) | `src/utils/sound.ts` | `src/utils/sound.test.ts` |
+| Sound engine + arcade motion (TIC-004) | `src/utils/sound.ts` (10 sounds, sweep/filter/reverb/tremolo, one mute flag), `src/styles/index.css` (pop, shockwave, shake, laser, confetti, score bounce) | `src/utils/sound.test.ts` (11 tests) + Playwright: shockwave class, `laser-glow`, 18 confetti, `score-bounce`, reduced-motion durations collapse |
 | Settings + confirmation dialogs | `src/components/SettingsDialog.tsx`, `ConfirmDialog.tsx` | `src/App.test.tsx` "settings and statistics" |
 
 ---
@@ -227,7 +228,7 @@ share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 | File | Responsibility |
 | --- | --- |
 | `utils/storage.ts` | Versioned persistence. `STORAGE_KEY`, `STORAGE_VERSION = 3`, `MAX_HISTORY_ENTRIES = 20`, `validatePersistedState`, `migratePersistedState` (v1 → v2 → v3; v3 adds `boardSize`, default 3×3), `loadPersistedState` / `savePersistedState` / `clearPersistedState` (never throw), `isStorageAvailable()`. |
-| `utils/sound.ts` | Web Audio effects (`move`, `win`, `lose`, `draw`), lazy `AudioContext`, `resume()`, every failure swallowed. |
+| `utils/sound.ts` | The Web Audio engine: `placeX` (440→880 Hz sweep + 660 Hz triangle), `placeO` (300→150 Hz sweep through a 900 Hz low-pass), `hover` (throttled 800 Hz tick), `win` (C5-E5-G5-C6 arpeggio through a lazy 0.2 s convolution reverb), `lose`, `draw` (400 + 350 Hz with a 10 Hz tremolo), `click`, `turn`, `invalid`, `score`. Lazy `AudioContext` + `resume()`, one module-level mute flag (`setSoundMuted` / `isSoundMuted`), every failure swallowed. |
 | `utils/clipboard.ts` | `copyToClipboard` (Clipboard API → `execCommand` fallback), `shareOrCopy` (Web Share API → clipboard fallback). |
 | `hooks/usePersistentState.ts` | Reads synchronously on mount, de-duplicates writes by serialised signature, probes storage availability once. |
 | `test/setup.ts` | jest-dom, cleanup, `matchMedia` / `scrollTo` polyfills. |
@@ -563,10 +564,31 @@ Reusable CSS classes defined by hand in the same file: `.scene`, `.scene-grid`, 
 `.result-banner`, `.result-title`, `.dialog-overlay`, `.dialog-panel`, `.waiting-card`, `.live-dot`,
 `.arcade-scroll`, `.scroll-fade`.
 
-Motion keyframes: `mark-pop` (the one hero animation: 400 ms overshoot on a placed symbol),
-`win-pulse` (1.5 s loop on the winning cells), `dot-pulse`, `think-pulse`, `result-in`,
+Motion keyframes: `mark-pop` (the hero animation: 400 ms elastic overshoot with rotation on a
+placed symbol), `mark-bar` (the two bars of an X sweep in, the second with an 80 ms delay),
+`shockwave-lime` / `shockwave-cyan` (a 14 px ring pushed out of the cell, 450 ms), `shake` (2 px
+board kick, 180 ms), `cell-breathe` (2 s border pulse on the empty cells of small grids),
+`win-pulse` (1.5 s loop on the winning cells), `laser-glow` (the winning line), `confetti-fall`
+(0.8 s, 18 particles), `score-bounce`, `score-plus`, `board-morph` (board size change),
+`dot-pulse`, `think-pulse`, `result-in` (spring slide-up),
 `dialog-pop`, `fade-in` � all neutralised by a `prefers-reduced-motion: reduce` block.
 Everything else is a quiet colour/transform transition.
+
+Motion rules that are easy to get wrong:
+
+- **A cell clips its own overflow**, so the shockwave is a `box-shadow` on the cell
+  (`[data-last='true'][data-value='X'|'O']`), never a child element — a child would be cut off.
+- **`data-turn` is the player who moves next, not the one who just moved.** That is why the
+  shockwave takes its colour from `data-value` while only the hover glow uses `data-turn`.
+- **Confetti is generated from the index, not `Math.random`**, so a re-render cannot reshuffle a
+  burst that is still in the air.
+- **Idle breathing is limited to `data-density='cozy'`** (≤ 4×4): 100 infinite border animations
+  on a 10×10 are not worth the paint.
+- The screen kick toggles a class for 180 ms in `GameBoard`, because a CSS animation only
+  restarts when it is re-applied.
+- Sound is one module (`src/utils/sound.ts`) with a **single module-level mute flag**
+  (`setSoundMuted`, driven from `App`), so components call `playSound(...)` directly instead of
+  threading a prop through five of them.
 
 Rules that must be preserved:
 
@@ -641,7 +663,7 @@ Rules that must be preserved:
 
 ## 13. Testing strategy
 
-276 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
+281 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
 after each test and polyfills `matchMedia` / `scrollTo`.
 
 | Suite | Focus |
@@ -650,7 +672,7 @@ after each test and polyfills `matchMedia` / `scrollTo`.
 | `src/game/ai.test.ts` | Easy always legal; medium wins / blocks / centre / corner; hard wins forced wins, avoids forced losses, **is optimal in every reachable position**, **never loses as X and never loses as O**, works with either symbol, returns `null` for finished games. Plus "big boards": a 10×10 move under 500 ms, completing and blocking five in a row on 10×10, a forced win on 4×4, a legal move for every difficulty on 4×4 and `null` on a finished board. |
 | `src/game/gameReducer.test.ts` | Turn alternation, rejections, scoring exactly once, per-mode score books, history capped at 20, round/match/mode/symbol flows, the online snapshot path and its version guard. Plus `setBoardSize`: fresh 16 cell round with the scores kept, rejected 2×3 / 11×11, same-size no-op, scoring a 4×4 round, no false win at three marks on 5×5, and the online mode forcing 3×3. |
 | `src/utils/storage.test.ts` | Validation, field repair, the v1 → v2 → v3 migrations, a persisted board size (and its repair), the shape of a big board history entry, corrupted JSON, blocked `localStorage`. |
-| `src/utils/sound.test.ts` | Oscillator creation, multi-tone win/draw, no-throw when the API is missing or the context fails. |
+| `src/utils/sound.test.ts` | The X sweep ends at 880 Hz, O goes through a low-pass, the win is a four-note arpeggio with one convolver, the draw adds LFOs, every one of the ten names plays without throwing, the mute flag silences and restores, the hover tick is throttled to one per 100 ms, and the engine survives a missing API, missing filters/convolver or a throwing oscillator. |
 | `src/online/roomCode.test.ts` | Code normalisation and validation, formatting, invite link build/parse, display name sanitising, move id format. |
 | `src/online/config.test.ts` | Missing variables, malformed URLs, valid configuration, the app URL fallback. |
 | `src/online/onlineApi.test.ts` | Payload validation, the `online:<code>` → friendly message mapping, the exact RPC arguments, error conversion. |
@@ -879,6 +901,34 @@ Desktop heights are the other half of the check, and Playwright does it without 
   `.board-stage` `scrollHeight === clientHeight`, and
   `document.querySelector('.stage-actions').getBoundingClientRect().bottom <= innerHeight`.
 - Then the narrow end: **375 px and 320 px**, where `scrollWidth === clientWidth` is the gate.
+
+For the sound and motion work (TIC-004) the browser can assert most of it, because
+`getComputedStyle(...).animationName` is the cheapest way to prove a class landed:
+
+```js
+// after a move
+document.querySelector('.cell-button[data-last="true"]')  // shockwave-lime / shockwave-cyan
+document.querySelector('.board-container').className       // ... board-shake for ~180 ms
+// after a win
+document.querySelector('.winning-line').className          // winning-line--h | --v | --diag
+document.querySelectorAll('.confetti-particle').length     // 18
+document.querySelector('.score-pill[data-bumped="true"]')  // + .score-bump "+1"
+```
+
+Also check:
+
+1. **3×3 and 10×10** - the shockwave and the laser line on a horizontal, a vertical and both
+   diagonals; on 10×10 the empty cells must have **no** `cell-breathe` (`data-density='dense'`).
+2. **Reduced motion** - `browser_emulate_media({ reducedMotion: 'reduce' })`, then every
+   `animationDuration` must be `1e-06s` and the mark must still be visible (`opacity: 1`).
+3. **Mute** - the header speaker button must silence everything (the flag is module-wide), and
+   🔊 must bring it back.
+4. **First interaction** - no sound before the first click/hover/key press (autoplay policy);
+   after one, the sounds play.
+5. **Confetti and overflow** - replay a win at 320 px with the burst frozen
+   (`document.getAnimations().forEach(a => { if (a.animationName === 'confetti-fall') { a.currentTime = 300; a.pause(); } })`)
+   and confirm `scrollWidth === clientWidth` (the pieces fly past the board edge).
+
 
 For the online mode you can additionally point the app at a throwaway mock of the Supabase
 Auth/PostgREST endpoints (a small Node `http` server) and drive a full create → invite → join →
@@ -1114,6 +1164,36 @@ the expected version.
 - `README.md` gained a "Laptop viewport fit" section and the TIC-002 board-size/AI/online-limit
   notes; §11, §16, §19 and trap 37 of this file were updated with the real numbers.
 
+**Phase 8 — arcade sound and motion (TIC-004)**
+
+- `src/utils/sound.ts` rewritten as a small engine: `playTone` now supports a frequency sweep,
+  a low-pass filter, an amplitude LFO (tremolo) and a send to one lazily built 0.2 s convolution
+  reverb. Ten sounds: `placeX` (440→880 Hz + 660 Hz triangle), `placeO` (300→150 Hz through a
+  900 Hz low-pass), `hover` (800 Hz, throttled to one per 100 ms), `win` (C5-E5-G5-C6 arpeggio with
+  reverb), `lose`, `draw` (400 + 350 Hz, 10 Hz tremolo), `click`, `turn`, `invalid`, `score`.
+  The old `move` name is gone; `App` picks `placeX`/`placeO` from the mark that actually landed.
+- One module-level mute flag (`setSoundMuted`, set from `App` when the header speaker changes) so
+  `GameCell`, `TurnIndicator` and `ScoreBoard` can play a sound without prop plumbing. Every path
+  stays inside the tolerant wrapper: a missing API, a missing `createBiquadFilter`/`createConvolver`
+  or a throwing oscillator still leaves the game playable.
+- Motion: elastic `mark-pop` with rotation, staggered `mark-bar` sweep for the X, a `box-shadow`
+  ring (`shockwave-lime` / `shockwave-cyan`) instead of a child element because a cell clips its own
+  overflow, a 180 ms `shake` class toggled in `GameBoard`, `cell-breathe` on the empty cells of the
+  small grids only, the winning line as a lime→cyan gradient with `laser-glow`, 18 confetti pieces
+  generated from the index (never `Math.random` in render), `score-bounce` + a floating `+1`,
+  a spring `result-in`, `board-morph` on a board-size change, `scale(0.96)` on button press, and a
+  `dot-pulse` that now actually reaches 1.6×.
+- Feedback and sound wiring: a document-level `pointerdown` listener plays `click` for every button
+  and pill except the board cells, an occupied cell buzzes `invalid`, and the score book plays
+  `score` when a tile gains a point.
+- `sound.test.ts` rewritten (11 tests): the sweep target, the filter, the arpeggio + convolver, the
+  LFOs, all ten names, mute on/off, the hover throttle and the degraded paths. 281 tests total.
+- Verified with Playwright on the preview build: `shockwave-lime`/`shockwave-cyan` on the last cell,
+  `board-shake` present for ~180 ms, `winning-line--h` with a lime→cyan gradient and `laser-glow`,
+  18 confetti particles, `score-bounce` + `+1` on `score-x`, 3 winning cells, `result-in` on the
+  banner, no `cell-breathe` on a 10×10, every duration `1e-06s` under reduced motion, and
+  `314/314` at 320 px with the confetti burst frozen mid-air.
+
 ---
 
 ## 21. What is still unverified
@@ -1143,5 +1223,5 @@ The exact steps are in the README under *Online multiplayer setup*.
 ---
 
 *Last verified: 2026-11-04 — Windows 11, Node v22.23.2, npm 10.9.8.
-276/276 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
+281/281 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
 lint clean · production build clean.*

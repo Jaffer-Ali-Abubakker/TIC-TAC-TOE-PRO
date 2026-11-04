@@ -46,6 +46,7 @@ not the browser - decides whether a move is legal.
 - [Project structure](#project-structure)
 - [Game rules](#game-rules)
 - [AI difficulty levels](#ai-difficulty-levels)
+- [Sound and motion](#sound-and-motion)
 - [Accessibility](#accessibility)
 - [Known limitations](#known-limitations)
 
@@ -64,6 +65,11 @@ not the browser - decides whether a move is legal.
 - Scoreboard, per-mode statistics and a 20-entry match history.
 - Restart round, new match, settings dialog and optional sound effects.
 - Everything persists in `localStorage`.
+- **Arcade feel:** an elastic pop with a shockwave ring and a 2px screen kick on
+  every mark, a hand-drawn X, a lime→cyan laser line with glow on the winning
+  row and eighteen confetti pieces, a breathing border on the empty cells of a
+  small grid, a bouncing score with a floating `+1`, and a full Web Audio sound
+  engine (see [Sound and motion](#sound-and-motion)).
 
 **Online mode (needs a Supabase project)**
 
@@ -91,6 +97,7 @@ not the browser - decides whether a move is legal.
 | UI tests           | React Testing Library + user-event                  |
 | Database tests     | Vitest + PGlite (a real PostgreSQL engine in WASM)  |
 | Linting            | ESLint 10 flat config with typescript-eslint        |
+| Sound              | Web Audio API - custom engine, no audio assets      |
 
 ## Quick start
 
@@ -494,7 +501,7 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 276 tests in 14 files:
+The suite has 281 tests in 14 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
@@ -511,8 +518,9 @@ The suite has 276 tests in 14 files:
   rolling the board back) and the board size changes.
 - **Storage** (`src/utils/storage.test.ts`) - schema validation, the v1 to v2 to
   v3 migrations, a persisted board size, corrupted JSON, blocked `localStorage`.
-- **Sound** (`src/utils/sound.test.ts`) - Web Audio behaviour and failure
-  tolerance.
+- **Sound** (`src/utils/sound.test.ts`) - the X sweep, the O low-pass, the win
+  arpeggio with its convolver, the draw tremolo, every sound name, the mute flag,
+  the hover throttle and the degraded paths (no API, no filter, throwing node).
 - **Online module** (`src/online/*.test.ts`) - room codes, invite links,
   configuration validation, the API layer, the error mapping and the room
   controller (realtime subscription, polling fallback, reconnect, move
@@ -795,7 +803,7 @@ actions row is always the last thing inside the viewport.
     │   └── setup.ts               # Vitest / Testing Library setup
     └── utils/
         ├── clipboard.ts           # Clipboard and Web Share with fallbacks
-        ├── sound.ts               # Web Audio API sound effects
+        ├── sound.ts               # Web Audio engine: 10 synthesised arcade sounds
         └── storage.ts             # Versioned persistence (v3 adds the board size)
 ```
 
@@ -847,6 +855,61 @@ Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
     improves, with a nudge towards the centre. A 10×10 move is answered in a
     few milliseconds instead of freezing the page.
 
+## Sound and motion
+
+Everything is generated in the browser. There are no audio files, no fonts
+beyond the two Google Fonts already used, no canvas and no animation library:
+the sounds are oscillators and the animations are CSS transforms.
+
+### Sounds (Web Audio API)
+
+`src/utils/sound.ts` builds every sound from oscillators, gains, a low-pass
+filter and one small convolution reverb. X is lime and sharp, O is cyan and
+round, so a player can *hear* whose mark just landed:
+
+| Sound | What it is |
+| --- | --- |
+| `placeX` | 440 → 880 Hz sine sweep plus a 660 Hz triangle: a sharp upward blip |
+| `placeO` | 300 → 150 Hz sine sweep through a 900 Hz low-pass: a deep bubble |
+| `hover` | 800 Hz, 40 ms tick, throttled to one per 100 ms |
+| `win` | C5-E5-G5-C6 arpeggio (523 / 659 / 784 / 1046 Hz) with a 0.2 s reverb |
+| `lose` | 320 → 214 Hz drop |
+| `draw` | 400 Hz and 350 Hz together, 10 Hz tremolo |
+| `click` | 600 Hz square, 50 ms |
+| `turn` | 500 Hz, 60 ms - the turn passes in two-player mode |
+| `invalid` | 150 Hz sawtooth through a 600 Hz filter - an occupied cell |
+| `score` | 900 Hz pop plus a 1200 Hz sparkle |
+
+- One shared mute flag (`setSoundMuted`) is driven by the header speaker
+  button, so any component can play a sound without prop plumbing.
+- The `AudioContext` is created lazily on the first interaction (a click, a
+  hover or a key press) and resumed if the browser suspended it, which is what
+  gets around the autoplay policy.
+- Every call is wrapped: if the API is missing, blocked or throws mid-note, the
+  game simply stays silent.
+
+### Motion
+
+| Where | Effect |
+| --- | --- |
+| Placing a mark | elastic `mark-pop` (0.2 → 1.22 → 0.96 → 1 with rotation), staggered `mark-bar` sweep for the X, a 14px ring pushed out of the cell (`shockwave-lime` / `shockwave-cyan`), 2px board kick (`shake`) |
+| Empty cell, small grids | `cell-breathe` border pulse (2s); hover turns the border lime on X's turn and cyan on O's turn, with a 20px glow |
+| Winning line | lime→cyan gradient, `laser-glow` pulse, plus `win-pulse` on the three winning cells |
+| Win | 18 confetti pieces, generated from the index (never `Math.random` in render) and thrown from the winning line with gravity |
+| Score | the tile glows, the number bounces (`score-bounce`) and a `+1` floats up (`score-plus`) |
+| Turn indicator | the dot pulses to 1.6× (`dot-pulse`) |
+| Result banner | spring slide-in from below with overshoot |
+| Buttons and pills | `scale(0.96)` on press |
+| Board size change | the new board fades and scales in (`board-morph`) |
+
+Everything animates `transform`, `opacity`, `box-shadow` or `filter` only, so it
+stays on the compositor. Rings use `box-shadow` rather than a child element
+because a cell clips its own overflow, and idle breathing is limited to the
+small grids: 100 pulsing borders on a 10×10 would cost more than it is worth.
+
+`prefers-reduced-motion: reduce` neutralises every one of these (the durations
+collapse to a single frame), while the game and the sounds keep working.
+
 ## Accessibility
 
 - Semantic HTML with a logical heading structure and labelled sections.
@@ -859,7 +922,10 @@ Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
 - Dialogs use `role="dialog"` with `aria-modal`, move focus inside, trap
   `Tab`, close on `Escape` and restore focus to the trigger.
 - X and O differ by shape (a cross and a circle), not only by colour.
-- `prefers-reduced-motion: reduce` disables the animations.
+- `prefers-reduced-motion: reduce` disables every animation and transition
+  (pop, shockwave, magnetic kick, confetti, laser, breathing borders) while
+  keeping the instant state change, and sound is only ever played inside the
+  same tolerant wrapper.
 
 ## Known limitations
 
@@ -893,5 +959,7 @@ Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
   plies (4×4) or plays a line heuristic (5×5 and up), so a strong human can win.
 - Online multiplayer is **3×3 only**. Bigger boards (4×4 up to 10×10) are local
   modes only; the server payload is nine cells by design.
-- Sound effects use the Web Audio API. Some browsers block audio until the
-  first interaction; the game is unaffected and simply stays silent.
+- Sound effects use the Web Audio API. Browsers block audio until the first
+  interaction, so the context is created on the first click, hover or key press;
+  before that (or if the API is blocked entirely) the game is unaffected and
+  simply stays silent.

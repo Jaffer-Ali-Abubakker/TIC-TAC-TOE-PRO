@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { Bot, User, Users } from 'lucide-react'
 import type { GameMode, Player } from '../game/types'
+import { playSound } from '../utils/sound'
 
 export interface TurnIndicatorProps {
   mode: GameMode
@@ -29,6 +31,15 @@ export function TurnIndicator({
   mySymbol = null,
   waitingForOpponent = false,
 }: TurnIndicatorProps) {
+  // A short blip when the turn passes to the other player in two-player mode;
+  // the first render is the start of the match, not a change.
+  const previousPlayer = useRef(currentPlayer)
+  useEffect(() => {
+    if (previousPlayer.current === currentPlayer) return
+    previousPlayer.current = currentPlayer
+    if (mode === 'pvp') playSound('turn')
+  }, [currentPlayer, mode])
+
   let info: TurnInfo
 
   if (mode === 'online') {
