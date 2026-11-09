@@ -381,13 +381,38 @@ describe('setBoardSize', () => {
     expect(state.winner).toBeNull()
   })
 
-  it('forces the classic board in the online mode', () => {
+  it('keeps the chosen size when the online mode is entered', () => {
     const online = reduce(
-      reduce(createInitialGameState(), { type: 'setBoardSize', rows: 10, cols: 10 }),
+      reduce(createInitialGameState(), { type: 'setBoardSize', rows: 6, cols: 6 }),
       { type: 'setMode', mode: 'online' },
     )
 
-    expect(online.boardSize).toEqual({ rows: 3, cols: 3, winLength: 3 })
-    expect(online.board).toHaveLength(9)
+    // The lobby needs the picked size to offer it to the room creator.
+    expect(online.boardSize).toEqual({ rows: 6, cols: 6, winLength: 4 })
+    expect(online.board).toHaveLength(36)
+  })
+
+  it('adopts the room geometry from the authoritative snapshot', () => {
+    const online = reduce(createInitialGameState(), {
+      type: 'applyOnlineState',
+      snapshot: {
+        boardSize: { rows: 10, cols: 10, winLength: 5 },
+        board: Array.from({ length: 100 }, (_, index) => (index === 99 ? 'X' : null)),
+        currentTurn: 'O',
+        status: 'playing',
+        winnerSymbol: null,
+        winningCombination: null,
+        roundNumber: 1,
+        movesPlayed: 1,
+        lastMoveIndex: 99,
+        version: 2,
+        result: null,
+      },
+      mySymbol: 'X',
+    })
+
+    expect(online.boardSize).toEqual({ rows: 10, cols: 10, winLength: 5 })
+    expect(online.board).toHaveLength(100)
+    expect(online.board[99]).toBe('X')
   })
 })

@@ -1,5 +1,5 @@
 import { Circle, CloudOff, Radio, RefreshCw, Wifi } from 'lucide-react'
-import type { Player } from '../../game/types'
+import type { BoardSize, Player } from '../../game/types'
 import type { OnlineConnectionStatus, OnlinePlayer } from '../../online/types'
 
 export interface OnlinePlayersBarProps {
@@ -9,6 +9,7 @@ export interface OnlinePlayersBarProps {
   connection: OnlineConnectionStatus
   opponentPresent: boolean | null
   roundNumber: number
+  boardSize: BoardSize
 }
 
 const CONNECTION_COPY: Record<
@@ -51,6 +52,7 @@ export function OnlinePlayersBar({
   connection,
   opponentPresent,
   roundNumber,
+  boardSize,
 }: OnlinePlayersBarProps) {
   const connectionCopy = CONNECTION_COPY[connection]
   const ConnectionIcon =
@@ -136,9 +138,12 @@ export function OnlinePlayersBar({
       </div>
 
       <p className="mt-3 flex items-center justify-between gap-2 text-[13px]">
-        <span className="text-muted">
+        <span className="flex items-center gap-2 text-muted">
           Round {roundNumber}
           {mySymbol ? ` - you play ${mySymbol}` : ''}
+          <span className="rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[11px] tracking-[0.08em] text-cyan">
+            {boardSize.rows}×{boardSize.cols}
+          </span>
         </span>
         <span
           role="status"

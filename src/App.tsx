@@ -161,6 +161,11 @@ export default function App() {
     dispatch({
       type: 'applyOnlineState',
       snapshot: {
+        boardSize: {
+          rows: onlineRoom.room.rows,
+          cols: onlineRoom.room.cols,
+          winLength: onlineRoom.room.winLength,
+        },
         board: onlineRoom.room.board,
         currentTurn: onlineRoom.room.currentTurn,
         status,
@@ -314,7 +319,9 @@ export default function App() {
       if (size.rows === state.boardSize.rows && size.cols === state.boardSize.cols) return
 
       const apply = () => dispatch({ type: 'setBoardSize', rows: size.rows, cols: size.cols })
-      if (hasActiveRound(state)) {
+      // The online lobby picks the size of a room that does not exist yet, so
+      // there is no round on screen to discard.
+      if (state.mode !== 'online' && hasActiveRound(state)) {
         requestConfirm({
           title: 'Change board size?',
           description: `The round in progress will be discarded and a new ${size.rows}×${size.cols} round will start. The scores are kept.`,
@@ -483,10 +490,12 @@ export default function App() {
             <OnlineLobby
               displayName={online.displayName}
               onDisplayNameChange={online.setDisplayName}
+              boardSize={state.boardSize}
+              onBoardSizeChange={handleBoardSizeChange}
               busy={online.busy}
               error={online.error}
               inviteCode={inviteCode}
-              onCreate={() => void online.createRoom()}
+              onCreate={() => void online.createRoom(state.boardSize)}
               onJoin={(code) => void online.joinRoom(code)}
             />
           ) : isOnline && waitingForOpponent ? (
@@ -498,10 +507,12 @@ export default function App() {
                 connection={online.connection}
                 opponentPresent={online.opponentPresent}
                 roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+                boardSize={state.boardSize}
               />
               <OnlineWaitingRoom
                 roomCode={onlineRoomState?.room.joinCode ?? ''}
                 inviteLink={online.inviteLink}
+                boardSize={state.boardSize}
                 busy={online.busy}
                 onLeave={() => void online.leaveRoom()}
               />
@@ -515,6 +526,7 @@ export default function App() {
                 connection={online.connection}
                 opponentPresent={online.opponentPresent}
                 roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+                boardSize={state.boardSize}
               />
               {boardPanel}
             </>

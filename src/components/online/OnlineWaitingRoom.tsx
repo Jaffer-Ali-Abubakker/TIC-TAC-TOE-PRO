@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Check, Copy, Link2, LogOut, Share2, UserPlus } from 'lucide-react'
+import type { BoardSize } from '../../game/types'
 import { formatRoomCode } from '../../online/roomCode'
 import { copyToClipboard, shareOrCopy, type CopyOutcome } from '../../utils/clipboard'
 
 export interface OnlineWaitingRoomProps {
   roomCode: string
   inviteLink: string | null
+  boardSize: BoardSize
   busy: boolean
   onLeave: () => void
 }
@@ -24,11 +26,13 @@ function noticeFor(outcome: CopyOutcome, success: string): Notice {
 export function OnlineWaitingRoom({
   roomCode,
   inviteLink,
+  boardSize,
   busy,
   onLeave,
 }: OnlineWaitingRoomProps) {
   const [notice, setNotice] = useState<Notice>(null)
   const formatted = formatRoomCode(roomCode)
+  const { rows, cols, winLength } = boardSize
 
   const handleCopyCode = async () => {
     const outcome = await copyToClipboard(roomCode)
@@ -45,7 +49,7 @@ export function OnlineWaitingRoom({
     if (!inviteLink) return
     const outcome = await shareOrCopy(
       'Tic-Tac-Toe Pro',
-      `Join my Tic-Tac-Toe room ${formatted}`,
+      `Join my Tic-Tac-Toe room ${formatted} (${rows}×${cols})`,
       inviteLink,
     )
     setNotice(noticeFor(outcome, 'Invite shared.'))
@@ -62,12 +66,27 @@ export function OnlineWaitingRoom({
         </h2>
         <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted">
           Share the room code or the invite link. The match starts as soon as a second player
-          joins.
+          joins - you will play a {rows}×{cols} board, {winLength} in a row to win.
         </p>
 
-        <p className="mt-6 rounded-sm border-2 border-border bg-card px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-text sm:text-3xl sm:tracking-[0.3em]">
-          {formatted}
-        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <p className="rounded-sm border-2 border-border bg-card px-4 py-3 text-center font-mono text-2xl tracking-[0.18em] text-text sm:text-3xl sm:tracking-[0.3em]">
+            {formatted}
+          </p>
+          <span className="rounded-sm border-2 border-cyan/40 bg-cyan/10 px-2 py-1 font-mono text-[11px] tracking-[0.12em] text-cyan">
+            {rows}×{cols}
+          </span>
+        </div>
+
+        <div
+          className="mt-3 grid w-fit gap-[2px] opacity-70"
+          style={{ gridTemplateColumns: `repeat(${cols}, 8px)` }}
+          aria-hidden="true"
+        >
+          {Array.from({ length: rows * cols }, (_, index) => (
+            <span key={index} className="size-2 rounded-[1px] border border-border bg-void" />
+          ))}
+        </div>
 
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button type="button" onClick={handleCopyLink} disabled={!inviteLink} className="btn btn-primary">

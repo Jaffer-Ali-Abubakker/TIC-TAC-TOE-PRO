@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Player } from '../game/types'
+import type { BoardSize, Player } from '../game/types'
 import {
   createOnlineRoom,
   fetchOnlineRoomState,
@@ -57,7 +57,7 @@ export interface OnlineRoomController {
   opponentPresent: boolean | null
   iRequestedRematch: boolean
   opponentRequestedRematch: boolean
-  createRoom: () => Promise<void>
+  createRoom: (boardSize: BoardSize) => Promise<void>
   joinRoom: (code: string) => Promise<void>
   leaveRoom: () => Promise<void>
   submitMove: (cellIndex: number) => Promise<void>
@@ -255,35 +255,38 @@ export function useOnlineRoom(): OnlineRoomController {
    * Actions
    * ------------------------------------------------------------------ */
 
-  const createRoom = useCallback(async () => {
-    const activeClient = client ?? (await getSupabaseClient())
-    if (!activeClient) {
-      setError('Online multiplayer is not configured on this deployment.')
-      setErrorCode('unknown')
-      return
-    }
-
-    setBusy(true)
-    clearError()
-    try {
-      const attempt = await session.ensureSession()
-      if (!attempt.userId) {
-        // The session layer already reported the precise reason (for example
-        // "anonymous sign-ins are disabled"). Never overwrite it with a
-        // generic message.
-        setError(attempt.error ?? 'A guest session is required to create a room.')
-        setErrorCode((attempt.errorCode as OnlineErrorCode) ?? 'unauthenticated')
+  const createRoom = useCallback(
+    async (boardSize: BoardSize) => {
+      const activeClient = client ?? (await getSupabaseClient())
+      if (!activeClient) {
+        setError('Online multiplayer is not configured on this deployment.')
+        setErrorCode('unknown')
         return
       }
-      const state = await createOnlineRoom(activeClient, displayName)
-      applyState(state)
-    } catch (thrown) {
-      fail(thrown)
-      setBasePhase('error')
-    } finally {
-      setBusy(false)
-    }
-  }, [applyState, clearError, client, displayName, fail, session])
+
+      setBusy(true)
+      clearError()
+      try {
+        const attempt = await session.ensureSession()
+        if (!attempt.userId) {
+          // The session layer already reported the precise reason (for example
+          // "anonymous sign-ins are disabled"). Never overwrite it with a
+          // generic message.
+          setError(attempt.error ?? 'A guest session is required to create a room.')
+          setErrorCode((attempt.errorCode as OnlineErrorCode) ?? 'unauthenticated')
+          return
+        }
+        const state = await createOnlineRoom(activeClient, displayName, boardSize)
+        applyState(state)
+      } catch (thrown) {
+        fail(thrown)
+        setBasePhase('error')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [applyState, clearError, client, displayName, fail, session],
+  )
 
   const joinRoom = useCallback(
     async (code: string) => {

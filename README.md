@@ -75,6 +75,9 @@ not the browser - decides whether a move is legal.
 
 - Create a private room, join one with an eight character code, or open an
   invite link.
+- Choose the board size first: 3x3 up to 10x10 (100 cells), from presets or with
+  custom rows and columns. The room stores the geometry, so both players always
+  play the same board and the same win length (3 on 3x3, 4 up to 7x7, 5 above).
 - Real-time synchronised board, turn indicator, winner and winning line.
 - Server-authoritative moves: the database validates every move.
 - Anonymous sign-in - no account, no email, no password.
@@ -211,8 +214,14 @@ Everything below is done **once** in your Supabase project.
 
 ### 2. Apply the database migration
 
-The migration lives in `supabase/migrations/0001_online_multiplayer.sql` and
-creates every table, policy and function the online mode needs.
+The migrations live in `supabase/migrations/` and create every table, policy
+and function the online mode needs:
+
+| File | What it adds |
+| --- | --- |
+| `0001_online_multiplayer.sql` | The whole backend: tables, RPCs, RLS, grants, realtime |
+| `0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key |
+| `0003_online_board_size.sql` | `rows` / `cols` / `win_length` on rooms, geometry-aware win detection |
 
 **Option A - Supabase CLI (recommended)**
 
@@ -240,14 +249,18 @@ supabase db push
 1. Open *SQL Editor -> New query* in the Supabase dashboard.
 2. Paste the contents of `supabase/migrations/0001_online_multiplayer.sql`.
 3. Click *Run*.
+4. Repeat for `0002_online_moves_user_index.sql` and
+   `0003_online_board_size.sql`, in that order.
 
 **Option C - psql**
 
 ```powershell
 psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_online_multiplayer.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0002_online_moves_user_index.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0003_online_board_size.sql
 ```
 
-The migration is idempotent: re-running it is safe.
+Every migration is idempotent: re-running it is safe.
 
 ### Verifying the hosted database
 
@@ -343,7 +356,9 @@ You should see `PASS:` lines and a final
    id. The id is the only identity - display names are cosmetic labels.
 2. `create_online_room()` creates a room with a cryptographically random
    eight character code, seats the creator as **X** and marks the room
-   `waiting`.
+   `waiting`. The board size the creator picked in the lobby is stored on the
+   room (`rows`, `cols`, `win_length`); the win length is derived by the
+   database, never taken from the browser.
 3. The creator shares the code or the invite link
    (`https://your-app.example/?room=ABCD1234`).
 4. The visitor opens the link. The application shows the invitation but
@@ -371,15 +386,18 @@ You should see `PASS:` lines and a final
 | `id`                   | `uuid`        | Primary key                                  |
 | `join_code`            | `text`        | Unique, 8 characters of a 32 character alphabet (2^40) |
 | `status`               | `text`        | `waiting` / `active` / `finished` / `expired` |
-| `board`                | `text[]`      | Exactly 9 cells, each `null`, `X` or `O`     |
+| `rows`                 | `integer`     | 3-10, chosen by the creator, never changed   |
+| `cols`                 | `integer`     | 3-10, `rows * cols` at most 100              |
+| `win_length`           | `integer`     | 3, 4 or 5, derived from the shape            |
+| `board`                | `text[]`      | Exactly `rows * cols` cells, each `null`, `X` or `O` |
 | `current_turn`         | `text`        | `X` or `O`                                   |
-| `winning_combination`  | `integer[]`   | The three winning cell indexes               |
+| `winning_combination`  | `integer[]`   | The `win_length` winning cell indexes        |
 | `winner_symbol`        | `text`        | `X`, `O` or `null`                           |
 | `result`               | `text`        | `X`, `O`, `draw` or `null`                   |
 | `version`              | `integer`     | Monotonically increasing, used for ordering  |
 | `round_number`         | `integer`     | 1 based                                       |
-| `last_move_index`      | `integer`     | 0-8                                          |
-| `moves_played`         | `integer`     | 0-9                                          |
+| `last_move_index`      | `integer`     | 0 to `rows * cols - 1`                       |
+| `moves_played`         | `integer`     | 0 to `rows * cols`                           |
 | `created_at`/`updated_at`/`expires_at` | `timestamptz` |       |
 
 ### `public.online_room_players`
@@ -403,7 +421,7 @@ constraint is what makes a retried move idempotent.
 
 | Function                            | Purpose                                                   |
 | ----------------------------------- | --------------------------------------------------------- |
-| `create_online_room(display_name)`  | Creates a room, seats the caller as X                     |
+| `create_online_room(display_name, rows, cols)` | Creates a room of that size, seats the caller as X |
 | `join_online_room(code, name)`      | Seats the caller as O, activates the room                 |
 | `get_online_room_state(code)`       | Reads the authoritative state (members only)              |
 | `submit_online_move(code, cell, version, move_id)` | Validates and applies exactly one move         |
@@ -501,7 +519,7 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 281 tests in 14 files:
+The suite has 295 tests in 14 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
@@ -526,14 +544,17 @@ The suite has 281 tests in 14 files:
   controller (realtime subscription, polling fallback, reconnect, move
   idempotency).
 - **Application** (`src/App.test.tsx`, `src/App.online.test.tsx`) - the local
-  modes, the online lobby, room creation, joining, invite links, rematch,
-  connection status and the missing-configuration state.
-- **Database** (`supabase/tests/online_multiplayer.test.ts`) - the **real
-  migration** executed against a real PostgreSQL engine (PGlite) with a small
+  modes, the online lobby, room creation on a chosen board size, joining a room
+  of any size, invite links, rematch, connection status and the
+  missing-configuration state.
+- **Database** (`supabase/tests/online_multiplayer.test.ts`) - every migration
+  executed in order against a real PostgreSQL engine (PGlite) with a small
   Supabase shim. It proves that unauthenticated callers are rejected, that
   seats are allocated correctly, that a third player is turned away, that
   direct table writes fail, that illegal moves are rejected, that a retried
-  move is applied only once and that a rematch needs both players.
+  move is applied only once, that a rematch needs both players, and that a room
+  keeps the board size it was created with (four in a row on a 6×6, five on a
+  10×10, 3×3 when the size is omitted).
 - **SQL script** (`supabase/tests/online_multiplayer_sql.test.ts`) - executes
   the exact `supabase/tests/online_multiplayer.sql` script you paste into the
   Supabase SQL editor, so the script itself is verified and not just the
@@ -748,7 +769,8 @@ actions row is always the last thing inside the viewport.
 │   ├── tsconfig.json              # TypeScript config for the SQL tests
 │   ├── migrations/
 │   │   ├── 0001_online_multiplayer.sql   # Schema, RLS and the game functions
-│   │   └── 0002_online_moves_user_index.sql # Index for the move log FK
+│   │   ├── 0002_online_moves_user_index.sql # Index for the move log FK
+│   │   └── 0003_online_board_size.sql    # Room board size + geometry-aware wins
 │   └── tests/
 │       ├── harness.ts             # Local PostgreSQL harness (PGlite + shim)
 │       ├── online_multiplayer.test.ts    # Database security tests
@@ -759,6 +781,7 @@ actions row is always the last thing inside the viewport.
     ├── main.tsx                   # React entry point
     ├── App.tsx                    # Application shell and state wiring
     ├── components/
+    │   ├── BoardSizePicker.tsx     # Size pills + steppers (settings rail and lobby)
     │   ├── ConfirmDialog.tsx      # Destructive action confirmation
     │   ├── Dialog.tsx             # Reusable accessible modal dialog
     │   ├── GameBoard.tsx          # Any rows x cols board, roving tab index, arrow keys
@@ -836,8 +859,9 @@ Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
 - A win always takes precedence over a full board.
 - Changing the board size starts a fresh round (after a confirmation when a
   round is in progress) and keeps the scores and the history.
-- The **online mode is 3×3 only**, so the database schema does not have to carry
-  a variable board.
+- In the **online mode** the room carries its own `rows`, `cols` and
+  `win_length`, chosen by the creator before the room exists. Both players play
+  that geometry and the server validates every move against it.
 
 ## AI difficulty levels
 
@@ -957,8 +981,10 @@ collapse to a single frame), while the game and the sounds keep working.
   synchronised between devices and are not global.
 - The hard AI is only *unbeatable* on 3×3. On bigger boards it searches four
   plies (4×4) or plays a line heuristic (5×5 and up), so a strong human can win.
-- Online multiplayer is **3×3 only**. Bigger boards (4×4 up to 10×10) are local
-  modes only; the server payload is nine cells by design.
+- An online room keeps the board size it was created with. On a 10×10 room the
+  cells are small on a phone (38 px at 1400 px wide, ~14 px at 320 px), so the
+  large sizes are best played on a desktop. Rooms are always 3 to 10 per side
+  and at most 100 cells; the server rejects anything else.
 - Sound effects use the Web Audio API. Browsers block audio until the first
   interaction, so the context is created on the first click, hover or key press;
   before that (or if the API is blocked entirely) the game is unaffected and

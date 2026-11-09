@@ -97,6 +97,59 @@ describe('creating and joining a room', () => {
     expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(9)
   })
 
+  it('creates a room on the board size chosen in the lobby', async () => {
+    const user = userEvent.setup()
+    const payload = makeRoomPayload()
+    supabase.onRpc('create_online_room', () => ({
+      ...payload,
+      room: {
+        ...payload.room,
+        rows: 5,
+        cols: 5,
+        winLength: 4,
+        board: Array.from({ length: 25 }, () => null),
+      },
+    }))
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /online/i }))
+    await user.click(screen.getByRole('radio', { name: /^5×5$/ }))
+    expect(screen.getByText(/5×5 • 4 to win/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /create private room/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('ABCD-1234')).toBeInTheDocument()
+    })
+    expect(supabase.rpcCalls[0].args).toMatchObject({ p_rows: 5, p_cols: 5 })
+    expect(screen.getByText(/you will play a 5×5 board, 4 in a row to win/i)).toBeInTheDocument()
+  })
+
+  it('joins a room on the size the creator picked', async () => {
+    const user = userEvent.setup()
+    const payload = makeRoomPayload({ status: 'active' })
+    supabase.onRpc('join_online_room', () => ({
+      ...payload,
+      mySymbol: 'O',
+      room: {
+        ...payload.room,
+        rows: 6,
+        cols: 6,
+        winLength: 4,
+        board: Array.from({ length: 36 }, () => null),
+      },
+    }))
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /online/i }))
+    await user.type(screen.getByLabelText(/join with a room code/i), 'ABCD1234')
+    await user.click(screen.getByRole('button', { name: /^join$/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(36)
+    })
+    expect(screen.getByText('6×6')).toBeInTheDocument()
+  })
+
   it('shows a friendly error when the room is full', async () => {
     const user = userEvent.setup()
     supabase.failRpc('join_online_room', 'room_full')

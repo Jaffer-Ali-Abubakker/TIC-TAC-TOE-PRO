@@ -26,6 +26,9 @@ interface RoomPayload {
     id: string
     joinCode: string
     status: string
+    rows: number
+    cols: number
+    winLength: number
     board: (string | null)[]
     currentTurn: string
     winnerSymbol: string | null
@@ -111,6 +114,142 @@ describe('room creation', () => {
     await database.setUser(null)
     const error = await expectRpcError(database, `select public.create_online_room(null)`)
     expect(error).toBe('online:unauthenticated')
+  })
+})
+
+describe('board size', () => {
+  /** Creates a room of the given shape with both seats taken. */
+  async function sizedRoom(rows: number, cols: number): Promise<RoomPayload> {
+    const created = await rpc(`select public.create_online_room('Alice', $1, $2)`, [rows, cols])
+    await database.setUser(BOB)
+    const joined = await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+    await database.setUser(ALICE)
+    return joined
+  }
+
+  it('stores the chosen geometry and derives the win length', async () => {
+    const payload = await rpc(`select public.create_online_room('Alice', 6, 6)`)
+    expect(payload.room.rows).toBe(6)
+    expect(payload.room.cols).toBe(6)
+    expect(payload.room.winLength).toBe(4)
+    expect(payload.room.board).toHaveLength(36)
+    expect(payload.room.board.every((cell) => cell === null)).toBe(true)
+  })
+
+  it('derives three, four or five in a row from the shape', async () => {
+    const expected: Array<[number, number, number]> = [
+      [3, 3, 3],
+      [3, 5, 4],
+      [4, 4, 4],
+      [7, 7, 4],
+      [8, 8, 5],
+      [10, 10, 5],
+    ]
+    for (const [rows, cols, winLength] of expected) {
+      const payload = await rpc(`select public.create_online_room(null, $1, $2)`, [rows, cols])
+      expect(payload.room.winLength).toBe(winLength)
+      expect(payload.room.board).toHaveLength(rows * cols)
+    }
+  })
+
+  it('keeps 3x3 as the default, so old style rooms still work', async () => {
+    const payload = await rpc(`select public.create_online_room('Alice')`)
+    expect(payload.room.rows).toBe(3)
+    expect(payload.room.cols).toBe(3)
+    expect(payload.room.winLength).toBe(3)
+  })
+
+  it('rejects a size outside the limits', async () => {
+    const sizes: Array<[number, number]> = [
+      [2, 3],
+      [3, 2],
+      [11, 3],
+      [3, 11],
+      [10, 11],
+    ]
+    for (const [rows, cols] of sizes) {
+      const error = await expectRpcError(
+        database,
+        `select public.create_online_room(null, $1, $2)`,
+        [rows, cols],
+      )
+      expect(error).toBe('online:invalid_board_size')
+    }
+  })
+
+  it('accepts a cell anywhere on a 10x10 board and rejects one past the end', async () => {
+    const room = await sizedRoom(10, 10)
+    await database.setUser(ALICE)
+    const state = await rpc(`select public.submit_online_move($1, 99, null, gen_random_uuid())`, [
+      room.room.joinCode,
+    ])
+    expect(state.room.board[99]).toBe('X')
+    expect(state.room.lastMoveIndex).toBe(99)
+
+    await database.setUser(BOB)
+    const error = await expectRpcError(
+      database,
+      `select public.submit_online_move($1, 100, null, gen_random_uuid())`,
+      [room.room.joinCode],
+    )
+    expect(error).toBe('online:invalid_cell')
+  })
+
+  it('needs four in a row to win on a 6x6 board', async () => {
+    const room = await sizedRoom(6, 6)
+    const code = room.room.joinCode
+
+    await rpc(`select public.submit_online_move($1, 0, null, gen_random_uuid())`, [code])
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 6, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    await rpc(`select public.submit_online_move($1, 1, null, gen_random_uuid())`, [code])
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 7, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    const three = await rpc(`select public.submit_online_move($1, 2, null, gen_random_uuid())`, [code])
+    expect(three.room.status).toBe('active')
+    expect(three.room.result).toBeNull()
+
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 8, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    const four = await rpc(`select public.submit_online_move($1, 3, null, gen_random_uuid())`, [code])
+
+    expect(four.room.status).toBe('finished')
+    expect(four.room.result).toBe('X')
+    expect(four.room.winningCombination).toEqual([0, 1, 2, 3])
+  })
+
+  it('starts a rematch on the same geometry', async () => {
+    const room = await sizedRoom(6, 6)
+    const code = room.room.joinCode
+
+    await rpc(`select public.submit_online_move($1, 0, null, gen_random_uuid())`, [code])
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 6, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    await rpc(`select public.submit_online_move($1, 1, null, gen_random_uuid())`, [code])
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 7, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    await rpc(`select public.submit_online_move($1, 2, null, gen_random_uuid())`, [code])
+    await database.setUser(BOB)
+    await rpc(`select public.submit_online_move($1, 8, null, gen_random_uuid())`, [code])
+    await database.setUser(ALICE)
+    await rpc(`select public.submit_online_move($1, 3, null, gen_random_uuid())`, [code])
+
+    await rpc(`select public.request_online_rematch($1)`, [code])
+    await database.setUser(BOB)
+    const rematch = await rpc(`select public.request_online_rematch($1)`, [code])
+
+    expect(rematch.room.status).toBe('active')
+    expect(rematch.room.roundNumber).toBe(2)
+    expect(rematch.room.rows).toBe(6)
+    expect(rematch.room.cols).toBe(6)
+    expect(rematch.room.winLength).toBe(4)
+    expect(rematch.room.board).toHaveLength(36)
+    expect(rematch.room.board.every((cell) => cell === null)).toBe(true)
   })
 })
 

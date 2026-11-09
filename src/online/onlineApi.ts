@@ -7,7 +7,8 @@
  * a player id, a symbol, a winner or a turn.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Cell, Player } from '../game/types'
+import { normaliseBoardSize } from '../game/gameLogic'
+import type { BoardSize, Cell, Player } from '../game/types'
 import { normalizeRoomCode } from './roomCode'
 import type { Database } from './database.types'
 import { OnlineError, type OnlineErrorCode, type OnlineRoom, type OnlineRoomState } from './types'
@@ -37,6 +38,8 @@ const ERROR_MESSAGES: Record<OnlineErrorCode, string> = {
   stale_version: 'The board changed on the other device. The latest position has been loaded.',
   cell_taken: 'That cell was just taken.',
   invalid_cell: 'That is not a valid cell.',
+  invalid_board_size:
+    'That board size is not supported. Pick 3 to 10 rows and columns, up to 100 cells.',
   invalid_move_id: 'The move could not be identified. Please try again.',
   code_generation_failed: 'The room code could not be generated. Please try again.',
   network: 'The connection failed. Check your network and try again.',
@@ -98,12 +101,20 @@ export function parseOnlineRoomState(raw: unknown): OnlineRoomState | null {
   const roomRaw = raw.room
   if (!isRecord(roomRaw)) return null
 
+  // The geometry is stored on the room. Missing values mean a room created
+  // before board sizes existed, which is always the classic 3x3.
+  const size = normaliseBoardSize(
+    typeof roomRaw.rows === 'number' ? roomRaw.rows : 3,
+    typeof roomRaw.cols === 'number' ? roomRaw.cols : 3,
+  )
+  if (!size) return null
+
   const boardRaw = roomRaw.board
-  if (!Array.isArray(boardRaw) || boardRaw.length !== 9) return null
+  if (!Array.isArray(boardRaw) || boardRaw.length !== size.rows * size.cols) return null
 
   const winningRaw = roomRaw.winningCombination
   const winningCombination =
-    Array.isArray(winningRaw) && winningRaw.length === 3
+    Array.isArray(winningRaw) && winningRaw.length >= 3
       ? winningRaw.map((value) => Number(value)).filter((value) => Number.isInteger(value))
       : null
 
@@ -111,6 +122,9 @@ export function parseOnlineRoomState(raw: unknown): OnlineRoomState | null {
     id: String(roomRaw.id ?? ''),
     joinCode: String(roomRaw.joinCode ?? ''),
     status: (roomRaw.status ?? 'waiting') as OnlineRoom['status'],
+    rows: size.rows,
+    cols: size.cols,
+    winLength: size.winLength,
     board: boardRaw.map(asCell),
     currentTurn: asPlayer(roomRaw.currentTurn),
     winnerSymbol: roomRaw.winnerSymbol === 'X' || roomRaw.winnerSymbol === 'O' ? roomRaw.winnerSymbol : null,
@@ -118,7 +132,7 @@ export function parseOnlineRoomState(raw: unknown): OnlineRoomState | null {
       roomRaw.result === 'X' || roomRaw.result === 'O' || roomRaw.result === 'draw'
         ? roomRaw.result
         : null,
-    winningCombination: winningCombination && winningCombination.length === 3 ? winningCombination : null,
+    winningCombination: winningCombination && winningCombination.length >= 3 ? winningCombination : null,
     version: Number(roomRaw.version ?? 0),
     roundNumber: Number(roomRaw.roundNumber ?? 1),
     lastMoveIndex:
@@ -164,12 +178,23 @@ function requireState(raw: unknown): OnlineRoomState {
   return state
 }
 
-/** Creates a private room. The caller is seated as X. */
+/** Creates a private room of the given size. The caller is seated as X. */
 export async function createOnlineRoom(
   client: SupabaseClient,
   displayName: string,
+  boardSize: BoardSize,
 ): Promise<OnlineRoomState> {
-  const raw = await callRpc(client, 'create_online_room', { p_display_name: displayName })
+  // The database re-validates; this only turns a bad click into a clear message.
+  const size = normaliseBoardSize(boardSize.rows, boardSize.cols)
+  if (!size) {
+    throw new OnlineError('invalid_board_size', ERROR_MESSAGES.invalid_board_size)
+  }
+
+  const raw = await callRpc(client, 'create_online_room', {
+    p_display_name: displayName,
+    p_rows: size.rows,
+    p_cols: size.cols,
+  })
   return requireState(raw)
 }
 

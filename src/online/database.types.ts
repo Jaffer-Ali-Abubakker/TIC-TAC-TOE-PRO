@@ -47,14 +47,14 @@ isOneToOne: false
                   ]
                 },"online_rooms": {
                   Row: {
-                    "board": (string)[],"created_at": string,"current_turn": string,"expires_at": string,"id": string,"join_code": string,"last_move_index": number | null,"moves_played": number,"result": string | null,"round_number": number,"status": string,"updated_at": string,"version": number,"winner_symbol": string | null,"winning_combination": (number)[] | null
+                    "board": (string)[],"cols": number,"created_at": string,"current_turn": string,"expires_at": string,"id": string,"join_code": string,"last_move_index": number | null,"moves_played": number,"result": string | null,"round_number": number,"rows": number,"status": string,"updated_at": string,"version": number,"win_length": number,"winner_symbol": string | null,"winning_combination": (number)[] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "board": (string)[],"created_at"?: string,"current_turn"?: string,"expires_at"?: string,"id"?: string,"join_code": string,"last_move_index"?: number | null,"moves_played"?: number,"result"?: string | null,"round_number"?: number,"status"?: string,"updated_at"?: string,"version"?: number,"winner_symbol"?: string | null,"winning_combination"?: (number)[] | null
+                    "board": (string)[],"cols"?: number,"created_at"?: string,"current_turn"?: string,"expires_at"?: string,"id"?: string,"join_code": string,"last_move_index"?: number | null,"moves_played"?: number,"result"?: string | null,"round_number"?: number,"rows"?: number,"status"?: string,"updated_at"?: string,"version"?: number,"win_length"?: number,"winner_symbol"?: string | null,"winning_combination"?: (number)[] | null
                   }
                   Update: {
-                    "board"?: (string)[],"created_at"?: string,"current_turn"?: string,"expires_at"?: string,"id"?: string,"join_code"?: string,"last_move_index"?: number | null,"moves_played"?: number,"result"?: string | null,"round_number"?: number,"status"?: string,"updated_at"?: string,"version"?: number,"winner_symbol"?: string | null,"winning_combination"?: (number)[] | null
+                    "board"?: (string)[],"cols"?: number,"created_at"?: string,"current_turn"?: string,"expires_at"?: string,"id"?: string,"join_code"?: string,"last_move_index"?: number | null,"moves_played"?: number,"result"?: string | null,"round_number"?: number,"rows"?: number,"status"?: string,"updated_at"?: string,"version"?: number,"win_length"?: number,"winner_symbol"?: string | null,"winning_combination"?: (number)[] | null
                   }
                   Relationships: [
                     
@@ -66,7 +66,7 @@ isOneToOne: false
           }
           Functions: {
             "create_online_room":
-{ Args: { "p_display_name"?: string }; Returns: Json
+{ Args: { "p_cols"?: number,"p_display_name": string,"p_rows"?: number }; Returns: Json
                            },
 "get_online_room_state":
 { Args: { "p_join_code": string }; Returns: Json
@@ -78,10 +78,7 @@ isOneToOne: false
 { Args: { "p_join_code": string }; Returns: Json
                            },
 "online_board_is_full":
-{ Args: { "p_board": (string)[] }; Returns: boolean
-                           },
-"online_board_is_valid":
-{ Args: { "p_board": (string)[] }; Returns: boolean
+{ Args: { "p_board": (string)[],"p_cols": number,"p_rows": number }; Returns: boolean
                            },
 "online_code_is_valid":
 { Args: { "p_code": string }; Returns: boolean
@@ -110,8 +107,11 @@ isOneToOne: false
 "online_sanitize_name":
 { Args: { "p_name": string }; Returns: string
                            },
+"online_win_length":
+{ Args: { "p_cols": number,"p_rows": number }; Returns: number
+                           },
 "online_winning_combination":
-{ Args: { "p_board": (string)[] }; Returns: (number)[]
+{ Args: { "p_board": (string)[],"p_cols": number,"p_rows": number,"p_win": number }; Returns: (number)[]
                            },
 "request_online_rematch":
 { Args: { "p_join_code": string }; Returns: Json

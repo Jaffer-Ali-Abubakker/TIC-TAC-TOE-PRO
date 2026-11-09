@@ -23,6 +23,7 @@ import { createDefaultStats } from '../utils/storage'
 
 /** The authoritative room snapshot produced by the database. */
 export interface OnlineRoomSnapshot {
+  boardSize: BoardSize
   board: readonly (Player | null)[]
   currentTurn: Player
   status: GameStatus
@@ -259,8 +260,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const next: GameState = {
         ...state,
         mode: 'online',
-        // The server only ever hosts 3x3 rooms.
-        boardSize: THREE_BY_THREE,
+        // The creator picked the geometry; every client plays it.
+        boardSize: snapshot.boardSize,
         board: snapshot.board.slice(),
         currentPlayer: snapshot.currentTurn,
         status: snapshot.status,
@@ -307,11 +308,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'setMode': {
       if (action.mode === state.mode) return state
       // Switching mode always starts a clean round so a half finished board is
-      // never carried over. The online mode only hosts 3x3 rooms.
-      return startRound(
-        action.mode === 'online' ? { ...state, boardSize: THREE_BY_THREE } : state,
-        action.mode,
-      )
+      // never carried over. The online mode takes its size from the room once
+      // one is joined.
+      return startRound(state, action.mode)
     }
 
     case 'setDifficulty':

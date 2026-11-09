@@ -37,17 +37,18 @@ Everything below was actually executed in this workspace, not merely planned.
 | --- | --- | --- |
 | Types | `npm run typecheck` | ✅ passes, 0 errors |
 | Lint | `npm run lint` | ✅ passes, 0 problems |
-| Tests | `npm run test:run` | ✅ **281 tests / 14 files, all passing** |
-| Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
+| Tests | `npm run test:run` | ✅ **295 tests / 14 files, all passing** |
+| Database tests | `npm run test:db` | ✅ **51 tests** — every migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (308 kB JS / 96 kB gzip + a 214 kB lazy Supabase chunk, 43 kB CSS) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (310 kB JS / 96 kB gzip + a 214 kB lazy Supabase chunk, 44 kB CSS) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
 | Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 314 / scrollWidth 314` on a 320 px viewport — none, in every mode and on 3×3 / 4×4 / 10×10 |
 | Laptop viewport fit (TIC-003) | Playwright on the preview build | ✅ 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768, 1280×720 — page and centre column never scroll and the score row plus Restart/New Match stay inside the viewport (board 480 / 480 / 480 / 436 / 304 / 256 px) |
 | Sound + arcade motion (TIC-004) | Playwright on the preview build + `npm run test:run` | ✅ 10 Web Audio sounds (sweep, low-pass, reverb, tremolo, one mute flag), elastic pop, shockwave per mark colour, 180 ms board kick, lime→cyan laser line, 18 confetti, score bounce + `+1`, spring banner; reduced motion collapses every duration to `1e-06s`; 320 px stays `314/314` with the confetti mid-air |
-| Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 2 migrations recorded |
+| Online board size (TIC-005) | Playwright on the dev server + the hosted database | ✅ lobby picker (presets + steppers, `6×6 • 4 to win`, `10×10 • 5 to win`), a 6×6 room created and joined by a second browser context (36 cells each side), a move applied and seen by both, a 10×10 room (100 cells, 38 px each at 1400 px) with the waiting-room badge and 100-dot preview; `320/320` and `369/369` at 320/375 px, `1280/1280 · 720/720` at 1280×720 |
+| Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 3 migrations recorded |
 | Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
 | **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
 | **Live two-player match** | two Chrome profiles via CDP (§16) | ✅ create → invite → join → move each way; both boards converged on `X...O....`; DB recorded `status=active, version=4, 2 seats, 2 moves` |
@@ -67,8 +68,9 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | --- | --- | --- |
 | Player vs computer | `src/App.tsx` (AI scheduling), `src/game/ai.ts` | `src/App.test.tsx`, `src/game/ai.test.ts` |
 | Two player mode | `src/game/gameReducer.ts` (`mode: 'pvp'`) | `src/App.test.tsx` "two player mode" |
-| Board size 3×3 … 10×10 | `src/game/gameLogic.ts` (`getWinLength`, `generateWinLines`, `normaliseBoardSize`), `src/components/GameControls.tsx` | `gameLogic.test.ts` "dynamic board sizes", `gameReducer.test.ts` "setBoardSize", `App.test.tsx` "board size" |
+| Board size 3×3 … 10×10 | `src/game/gameLogic.ts` (`getWinLength`, `generateWinLines`, `normaliseBoardSize`), `src/components/BoardSizePicker.tsx` | `gameLogic.test.ts` "dynamic board sizes", `gameReducer.test.ts` "setBoardSize", `App.test.tsx` "board size" |
 | Online multiplayer | `src/online/*`, `src/components/online/*` | `src/online/*.test.ts`, `src/App.online.test.tsx` |
+| Online board size (rooms up to 10×10) | `supabase/migrations/0003_online_board_size.sql`, `onlineApi.createOnlineRoom(client, name, boardSize)`, `OnlineLobby` + `OnlineWaitingRoom` | `onlineApi.test.ts`, `useOnlineRoom.test.tsx`, `App.online.test.tsx`, `supabase/tests/online_multiplayer.test.ts` "board size" |
 | AI difficulty choice | `SettingsCards` in `src/components/GameControls.tsx`, `SettingsDialog.tsx` | `src/App.test.tsx` |
 | Score + statistics | `src/components/ScoreBoard.tsx`, `MatchStats.tsx` | `src/App.test.tsx`, `src/game/gameReducer.test.ts` |
 | Restart round / new match | `RoundControls` in `src/components/GameControls.tsx` + `ConfirmDialog.tsx` | `src/App.test.tsx` "round and match management" |
@@ -251,11 +253,12 @@ share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 | --- | --- |
 | `migrations/0001_online_multiplayer.sql` | The whole backend: tables, constraints, helper functions, the six client-facing RPCs, RLS policies, grants, the realtime publication and the private channel policy. |
 | `migrations/0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key (Postgres does not index FKs automatically). |
+| `migrations/0003_online_board_size.sql` | Room geometry: `rows`, `cols`, `win_length` (default 3, so old rooms stay 3×3), geometry-aware constraints, `online_win_length()`, a generic `online_winning_combination(board, rows, cols, win)`, `online_board_is_full(board, rows, cols)` and the geometry in every RPC payload (`create_online_room(name, rows, cols)`). |
 | `config.toml` | Supabase CLI project configuration (anonymous sign-in and realtime authorization are enabled). |
 | `tsconfig.json` | TypeScript config for the SQL test files (they need the Node types). |
-| `tests/harness.ts` | Runs the real migration on PGlite with a small Supabase shim (`auth.users`, `auth.uid()`, the `authenticated`/`anon`/`service_role` roles). |
-| `tests/online_multiplayer.test.ts` | 41 database security and behaviour tests. |
-| `tests/online_multiplayer_sql.test.ts` | Executes the SQL editor script end to end, and proves the migration is idempotent. |
+| `tests/harness.ts` | Runs **all** migrations, in filename order, on PGlite with a small Supabase shim (`auth.users`, `auth.uid()`, the `authenticated`/`anon`/`service_role` roles). `readMigrations()` is what keeps the tests honest when a migration is added. |
+| `tests/online_multiplayer.test.ts` | 48 database security and behaviour tests (including the board size block). |
+| `tests/online_multiplayer_sql.test.ts` | Executes the SQL editor script end to end, and proves every migration is idempotent. |
 | `tests/online_multiplayer.sql` | The script you paste into the Supabase SQL editor. |
 | `tests/verify_hosted.sql` | The hosted-database verification query used by `npm run verify:db`. |
 
@@ -282,8 +285,11 @@ pinned by `skills-lock.json`. See §15 for when **not** to use them.
 - `getGameStatus` order is **win first, then full board**. A full board with a line is a *win*,
   never a draw. A round can never be both.
 - A finished round rejects every further move — this is what makes double scoring impossible.
-- **The online mode is 3×3 only.** Entering it forces `boardSize` back to 3×3, so the server
-  payload (always nine cells) and the local grid can never disagree.
+- **An online room carries its own geometry.** The creator picks `rows`/`cols` (3-10, at most 100
+  cells) in the lobby; the room stores them plus the derived `win_length`. `applyOnlineState`
+  copies that `boardSize` into the game state, so the snapshot (always `rows * cols` cells) and
+  the local grid can never disagree. The size is fixed for the life of the room, including
+  rematches.
 
 ### Scoring policy (documented, implemented, tested)
 
@@ -401,6 +407,9 @@ onlineCountedRound number           // round whose outcome was already counted
 - `applyState` drops any snapshot with an older version.
 - A move keeps its `moveId` in `lastAttemptRef` so a retry of the same cell is idempotent.
 - The phase is **derived** from the room, never stored, so a stale phase is impossible.
+- `createRoom(boardSize)` sends `p_rows`/`p_cols` only. The win length is derived by the
+  database (`online_win_length`), never trusted from the browser. `parseOnlineRoomState` reads
+  the geometry back and rejects a board whose length is not `rows * cols`.
 
 ---
 
@@ -528,6 +537,16 @@ regression.
     and the 464 is the measured height of everything else in the column. If you add a row to the
     stage, add its height there or the score/actions fall out of the first fold on a laptop
     (that was the 1920×1008 cut-off).
+38. **Changing a SQL function's argument list creates an overload; it does not replace it.**
+    `create_online_room(text)` and `create_online_room(text, integer, integer)` can coexist, and
+    `create_online_room('Alice')` would then silently resolve to the *old* 3×3 function.
+    `0003_online_board_size.sql` therefore drops the one-argument versions first and re-grants
+    `EXECUTE` on the new signature (`GRANT` does not follow a `DROP`). The same applies to
+    `online_board_is_full` and `online_winning_combination`, which gained arguments.
+39. **A test harness that applies only `0001` silently tests the old schema.** `supabase/tests/
+    harness.ts` now reads every `migrations/*.sql` in filename order (`readMigrations()`), which is
+    also the order `supabase db push` uses. Add a migration and the database tests pick it up; the
+    SQL-editor script test replays them all to prove idempotency.
 
 ---
 
@@ -641,6 +660,12 @@ Rules that must be preserved:
   `display: none` from 1024 px, where both panels are always open.
 - Online and waiting-room cards sit in the stage column; they scroll internally
   when the window is too short.
+- The board size picker is one component (`BoardSizePicker`): the local settings rail and the
+  online lobby both render it inside a `.settings-card`, with different radio group names
+  (`board-size` / `online-board-size`) so two pickers can never fight over the same input.
+  The waiting room shows the size as a cyan pill next to the code plus a dot preview
+  (`grid-template-columns: repeat(cols, 8px)`, one 8 px cell per square, `aria-hidden`), and the
+  match status bar repeats the size next to `Round N`.
 - Dialogs: `width: min(32rem, 100vw - 1.5rem)`, `max-height: calc(100dvh - 1.5rem)`,
   `overflow-y: auto`.
 
@@ -667,23 +692,23 @@ Rules that must be preserved:
 
 ## 13. Testing strategy
 
-281 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
+295 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
 after each test and polyfills `matchMedia` / `scrollTo`.
 
 | Suite | Focus |
 | --- | --- |
 | `src/game/gameLogic.test.ts` | All winning lines for both symbols, draw detection, win-beats-full-board, invalid indices, occupied cells, moves after win/draw, immutability. Plus "dynamic board sizes": the win length table, the size limits, generated lines for 3×3/4×4, row/column/diagonal wins on 4×4 and 10×10, "four in a row is not enough on a 10×10", a 4×4 draw and out-of-range moves on a 16 cell board. |
 | `src/game/ai.test.ts` | Easy always legal; medium wins / blocks / centre / corner; hard wins forced wins, avoids forced losses, **is optimal in every reachable position**, **never loses as X and never loses as O**, works with either symbol, returns `null` for finished games. Plus "big boards": a 10×10 move under 500 ms, completing and blocking five in a row on 10×10, a forced win on 4×4, a legal move for every difficulty on 4×4 and `null` on a finished board. |
-| `src/game/gameReducer.test.ts` | Turn alternation, rejections, scoring exactly once, per-mode score books, history capped at 20, round/match/mode/symbol flows, the online snapshot path and its version guard. Plus `setBoardSize`: fresh 16 cell round with the scores kept, rejected 2×3 / 11×11, same-size no-op, scoring a 4×4 round, no false win at three marks on 5×5, and the online mode forcing 3×3. |
+| `src/game/gameReducer.test.ts` | Turn alternation, rejections, scoring exactly once, per-mode score books, history capped at 20, round/match/mode/symbol flows, the online snapshot path (including the room geometry) and its version guard. Plus `setBoardSize`: fresh 16 cell round with the scores kept, rejected 2×3 / 11×11, same-size no-op, scoring a 4×4 round, no false win at three marks on 5×5, the chosen size surviving the switch into the online mode, and the snapshot's geometry (10×10, 100 cells) being adopted. |
 | `src/utils/storage.test.ts` | Validation, field repair, the v1 → v2 → v3 migrations, a persisted board size (and its repair), the shape of a big board history entry, corrupted JSON, blocked `localStorage`. |
 | `src/utils/sound.test.ts` | The X sweep ends at 880 Hz, O goes through a low-pass, the win is a four-note arpeggio with one convolver, the draw adds LFOs, every one of the ten names plays without throwing, the mute flag silences and restores, the hover tick is throttled to one per 100 ms, and the engine survives a missing API, missing filters/convolver or a throwing oscillator. |
 | `src/online/roomCode.test.ts` | Code normalisation and validation, formatting, invite link build/parse, display name sanitising, move id format. |
 | `src/online/config.test.ts` | Missing variables, malformed URLs, valid configuration, the app URL fallback. |
-| `src/online/onlineApi.test.ts` | Payload validation, the `online:<code>` → friendly message mapping, the exact RPC arguments, error conversion. |
-| `src/online/useOnlineRoom.test.tsx` | Create / join / leave, invalid codes, friendly errors, move submission with the right version, **move id reuse on retry**, the turn guard, the version guard, the realtime subscription, refresh on a realtime event, subscription cleanup. |
+| `src/online/onlineApi.test.ts` | Payload validation (including the room geometry and a board that does not fit it), the `online:<code>` → friendly message mapping, the exact RPC arguments, error conversion. |
+| `src/online/useOnlineRoom.test.tsx` | Create / join / leave, creating a room on a chosen size, invalid codes, friendly errors, move submission with the right version, **move id reuse on retry**, the turn guard, the version guard, the realtime subscription, refresh on a realtime event, subscription cleanup. |
 | `src/App.test.tsx` | The local modes end to end, including the board size pills (preset switch + persistence), the "Change board size?" confirmation with the confirm and the `Escape` cancel path, and the custom rows/columns steppers. |
-| `src/App.online.test.tsx` | The online lobby, room creation, joining by code, invite links, the setup notice, rematch and the connection status. |
-| `supabase/tests/online_multiplayer.test.ts` | The **real migration** on a real PostgreSQL engine: unauthenticated rejection, seat allocation, the third player, a non-member, direct writes, illegal moves, idempotency, win/draw detection, rematch, leaving, the expiry sweep. |
+| `src/App.online.test.tsx` | The online lobby, room creation on a chosen board size, joining a room of any size (36 cells on a 6×6), invite links, the setup notice, rematch and the connection status. |
+| `supabase/tests/online_multiplayer.test.ts` | Every migration on a real PostgreSQL engine: unauthenticated rejection, seat allocation, the third player, a non-member, direct writes, illegal moves, idempotency, win/draw detection, rematch, leaving, the expiry sweep, and the board size block (geometry stored, win length derived, 4 in a row on a 6×6, cell 99 on a 10×10, a rematch keeping the size, invalid sizes rejected). |
 | `supabase/tests/online_multiplayer_sql.test.ts` | Runs the SQL editor script from start to finish and checks that it cleans up. |
 
 ### Conventions to follow when adding tests
@@ -709,12 +734,12 @@ after each test and polyfills `matchMedia` / `scrollTo`.
 
 ## 14. The database layer
 
-Read `supabase/migrations/0001_online_multiplayer.sql` before touching it. The complete
+Read `supabase/migrations/0001_online_multiplayer.sql` (and `0003` for the room geometry) before touching it. The complete
 public API is:
 
 | Function | Signature | What it does |
 | --- | --- | --- |
-| `create_online_room` | `(p_display_name text) → jsonb` | Creates a room with a CSPRNG code, seats the caller as **X** (owner), status `waiting`. |
+| `create_online_room` | `(p_display_name text, p_rows int = 3, p_cols int = 3) → jsonb` | Creates a room with a CSPRNG code and the requested geometry (3-10 per side, at most 100 cells), seats the caller as **X** (owner), status `waiting`. Rejects a bad size with `online:invalid_board_size`. |
 | `join_online_room` | `(p_join_code text, p_display_name text) → jsonb` | Seats the caller as **O** under a row lock, flips the room to `active`. Rejects a second seat for the same user and a third player. |
 | `get_online_room_state` | `(p_join_code text) → jsonb` | Returns the authoritative snapshot **and** refreshes the caller's `last_seen_at`. Members only. |
 | `submit_online_move` | `(p_join_code text, p_cell_index int, p_expected_version int, p_move_id uuid) → jsonb` | Validates and applies **exactly one** move. |
@@ -743,7 +768,8 @@ UI shows for it:
 | `online:not_your_turn` | It is the opponent's turn | "It is not your turn." |
 | `online:stale_version` | The board changed on the other device | "The board changed on the other device…" |
 | `online:cell_taken` | The cell is no longer empty | "That cell was just taken." |
-| `online:invalid_cell` | The index is not 0-8 | "That is not a valid cell." |
+| `online:invalid_cell` | The index is outside `0 … rows*cols-1` | "That is not a valid cell." |
+| `online:invalid_board_size` | `rows`/`cols` outside 3-10, or more than 100 cells | "That board size is not supported. Pick 3 to 10 rows and columns, up to 100 cells." |
 | `online:invalid_move_id` | The idempotency key is missing | "The move could not be identified…" |
 | `online:code_generation_failed` | 5 code collisions in a row | "The room code could not be generated…" |
 
@@ -774,6 +800,10 @@ Key properties of the layer:
 - `online_is_room_member()` is `SECURITY DEFINER` so the policies can call it without recursing.
 - Room codes are generated from `gen_random_uuid()` (the OS CSPRNG) mapped onto a 32 character
   alphabet, 8 characters = 2^40 possibilities.
+- The room owns its geometry: `rows`, `cols` and a derived `win_length` (`online_win_length`, the
+  same rule as `getWinLength`). The `board` is `array_fill(null, {rows*cols})`, `submit_online_move`
+  bounds-checks against `rows*cols` and `online_winning_combination(board, rows, cols, win)` scans
+  rows, columns and both diagonals. A room created before `0003` defaults to 3×3.
 
 ### Operational jobs
 
@@ -939,6 +969,29 @@ Auth/PostgREST endpoints (a small Node `http` server) and drive a full create �
 move session in the browser. That is how the online flow was verified locally. The mock is a
 development aid only and is **not** part of the repository.
 
+### The online board size (TIC-005) without a mock
+
+The hosted project now carries `0003`, so the fastest live check is the **dev server with the real
+`.env`** plus Playwright's `browser_run_code_unsafe`, which can open a second **context** (a second
+anonymous session) in one call:
+
+```js
+const browser = page.context().browser()
+const context2 = await browser.newContext()          // separate localStorage => separate seat
+const p2 = await context2.newPage()
+await p2.goto(`http://localhost:5173/?room=${code}`)
+```
+
+What was verified: the lobby picker (`6×6 • 4 to win`, `10×10 • 5 to win` via *More…* + steppers),
+a 6×6 room created and joined by the second context (36 cells on both sides, a move by X visible to
+O), a 10×10 room (100 cells, 38 px each, waiting-room badge and 100-dot preview), and the room row in
+the database (`rows 6 / cols 6 / win_length 4 / 36 cells / 2 seats`). Sizes: `320/320` (active 6×6),
+`369/369` (lobby at 375), `1400/1400 · 900/900`, `1280/1280 · 720/720` with a 256 px board.
+
+> The online stage scrolls **internally** at 900 px and below (the players bar is taller than the
+> local score row), so `.board-stage` `scrollHeight > clientHeight` there. The gate that must hold is
+> the **page**: `document.documentElement.scrollHeight === clientHeight`.
+
 ### Driving a real two-player match (no test dependency)
 
 To verify real multiplayer you need **two independent browsers**, not two tabs: two tabs share
@@ -974,7 +1027,9 @@ Useful CDP domains: `Network` (request/response URLs and bodies), `Runtime.conso
 - The hard AI is only **unbeatable on 3×3**. On boards up to 16 cells it searches four plies, and
   on 5×5 and up it plays a line heuristic, so a strong human can beat it. Full minimax on a 10×10
   board is not feasible in a browser.
-- The online mode is 3×3 only; the board size picker is hidden there.
+- An online room keeps the board size it was created with (3 to 10 per side, at most 100 cells).
+  The size is chosen before the room exists and cannot be changed afterwards; a rematch reuses it.
+  Large rooms are playable but the cells get small on a phone (about 14 px at 320 px on a 10×10).
 - Realtime presence is best effort and is never used to award a win.
 - The client polls every 2.5 s as a fallback when realtime is unavailable.
 - Rooms expire after two hours; `online_expire_rooms()` must be scheduled (see the README).
@@ -1198,6 +1253,48 @@ the expected version.
   banner, no `cell-breathe` on a 10×10, every duration `1e-06s` under reduced motion, and
   `314/314` at 320 px with the confetti burst frozen mid-air.
 
+**Phase 9 — online board size (TIC-005)**
+
+- The online mode is no longer 3×3 only. `supabase/migrations/0003_online_board_size.sql` adds
+  `rows`, `cols` and `win_length` (default 3, so every existing room stays 3×3) to `online_rooms`,
+  replaces the fixed 9-cell constraints with geometry-aware ones (`rows`/`cols` 3-10,
+  `rows*cols <= 100`, `cardinality(board) = rows*cols`, `moves_played`/`last_move_index` bound to
+  the room), relaxes the `online_moves` cell/number checks, and adds `online_win_length()` plus a
+  generic `online_winning_combination(board, rows, cols, win)` and
+  `online_board_is_full(board, rows, cols)`.
+- `create_online_room(p_display_name, p_rows = 3, p_cols = 3)` validates the size
+  (`online:invalid_board_size`), fills the board with `array_fill` and derives the win length
+  itself — the browser never supplies a win length. `submit_online_move` bounds-checks against
+  `rows*cols` and `request_online_rematch` rebuilds the board at the room's own size. `online_room_payload` now carries `rows`/`cols`/`winLength`, and the obsolete
+  `online_board_is_valid` is gone.
+- The `0003` migration **drops** the one-argument `create_online_room`, `online_board_is_full`,
+  `online_winning_combination` and `online_board_is_valid` first and re-grants `EXECUTE` on the new
+  signatures, so a stale 3×3 overload can never win name resolution (trap 38).
+- `BoardSizePicker` was extracted from `SettingsCards` and is now rendered by the online lobby too
+  (radio group `online-board-size`), so the same presets, *More…* steppers and live
+  `6×6 • 4 to win` badge serve both places. Create is disabled for an impossible size, and the
+  "Online supports 3×3 only" note is gone.
+- `createRoom(boardSize)` sends `p_rows`/`p_cols`, `parseOnlineRoomState` reads the geometry back
+  (defaulting missing values to 3×3 and rejecting a board that does not fit), the reducer's
+  `applyOnlineState` adopts `snapshot.boardSize` instead of forcing 3×3, and `setMode` no longer
+  resets the size. The lobby picker reuses the persisted `state.boardSize`, so the same choice
+  carries into the local modes.
+- The waiting room shows the size as a cyan pill beside the code, a `cols × 8 px` dot preview of the
+  grid (36 dots on a 6×6, 100 on a 10×10) and an invite line stating the board and the win length;
+  the match status bar repeats the size next to `Round N`.
+- A "Change board size?" confirmation no longer fires in the online lobby (there is no round on
+  screen to discard).
+- 14 new tests (295 total): the geometry in `parseOnlineRoomState`, the 3×3 fallback for a legacy
+  payload, `createOnlineRoom` rejecting an out-of-range size without a network call, `createRoom`
+  forwarding the size, a 6×6 join rendering 36 cells, a 5×5 create sending `p_rows/p_cols`,
+  `setMode` keeping the chosen size, `applyOnlineState` adopting a 10×10 snapshot, and the 7 database
+  tests for geometry, the win-length table, the 3×3 default, rejected sizes, cell 99, a four in a
+  row win on a 6×6 and a rematch that keeps the size.
+- `supabase/tests/harness.ts` now applies **every** migration in filename order and
+  `scripts/verify-database.ps1` expects 3 recorded migrations; `0003` was pushed to the hosted
+  project, `npm run verify:db` and `npm run gen:types` are green, and `database.types.ts` is now the
+  generated file (no more hand edits).
+
 ---
 
 ## 21. What is still unverified
@@ -1227,5 +1324,5 @@ The exact steps are in the README under *Online multiplayer setup*.
 ---
 
 *Last verified: 2026-11-09 — Windows 11, Node v22.23.2, npm 10.9.8.
-281/281 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
-lint clean · production build clean.*
+295/295 tests passing (incl. 51 database tests on a real PostgreSQL engine) · typecheck clean ·
+lint clean · production build clean · hosted database verified after `0003`.*

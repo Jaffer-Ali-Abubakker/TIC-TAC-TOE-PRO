@@ -35,7 +35,7 @@ describe('useOnlineRoom', () => {
     const { result } = renderHook(() => useOnlineRoom())
 
     await act(async () => {
-      await result.current.createRoom()
+      await result.current.createRoom({ rows: 3, cols: 3, winLength: 3 })
     })
 
     expect(result.current.room?.room.joinCode).toBe('ABCD1234')
@@ -44,8 +44,33 @@ describe('useOnlineRoom', () => {
     expect(result.current.inviteLink).toBe('https://play.example.com/?room=ABCD1234')
   })
 
-  it('joins a room and becomes active', async () => {
-    supabase.onRpc('join_online_room', () => ({
+  it('creates a room on the chosen board size', async () => {
+    const payload = makeRoomPayload()
+    supabase.onRpc('create_online_room', () => ({
+      ...payload,
+      room: {
+        ...payload.room,
+        rows: 6,
+        cols: 6,
+        winLength: 4,
+        board: Array.from({ length: 36 }, () => null),
+      },
+    }))
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.createRoom({ rows: 6, cols: 6, winLength: 4 })
+    })
+
+    const call = supabase.rpcCalls.find((entry) => entry.name === 'create_online_room')
+    expect(call?.args).toMatchObject({ p_rows: 6, p_cols: 6 })
+    expect(result.current.room?.room.rows).toBe(6)
+    expect(result.current.room?.room.cols).toBe(6)
+    expect(result.current.room?.room.winLength).toBe(4)
+    expect(result.current.room?.room.board).toHaveLength(36)
+  })
+
+  it('joins a room and becomes active', async () => {    supabase.onRpc('join_online_room', () => ({
       ...makeRoomPayload({ status: 'active' }),
       mySymbol: 'O',
     }))
@@ -64,7 +89,7 @@ describe('useOnlineRoom', () => {
     const { result } = renderHook(() => useOnlineRoom())
 
     await act(async () => {
-      await result.current.createRoom()
+      await result.current.createRoom({ rows: 3, cols: 3, winLength: 3 })
     })
 
     // The specific reason must not be replaced by a generic message.

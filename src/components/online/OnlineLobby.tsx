@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { Bot, Link2, LogIn, User, Users } from 'lucide-react'
+import { BoardSizePicker } from '../BoardSizePicker'
+import { normaliseBoardSize } from '../../game/gameLogic'
+import type { BoardSize } from '../../game/types'
 import { formatRoomCode, isValidRoomCode, normalizeRoomCode } from '../../online/roomCode'
 
 export interface OnlineLobbyProps {
   displayName: string
   onDisplayNameChange: (name: string) => void
+  boardSize: BoardSize
+  onBoardSizeChange: (rows: number, cols: number) => void
   busy: boolean
   error: string | null
   /** A room code that arrived through an invite link. */
@@ -17,6 +22,8 @@ export interface OnlineLobbyProps {
 export function OnlineLobby({
   displayName,
   onDisplayNameChange,
+  boardSize,
+  onBoardSizeChange,
   busy,
   error,
   inviteCode,
@@ -28,6 +35,7 @@ export function OnlineLobby({
 
   const normalized = normalizeRoomCode(code)
   const codeLooksValid = isValidRoomCode(normalized)
+  const sizeValid = normaliseBoardSize(boardSize.rows, boardSize.cols) !== null
 
   const submitJoin = () => {
     if (!codeLooksValid) {
@@ -64,7 +72,6 @@ export function OnlineLobby({
         <p className="helper-text mt-2">
           A name is only a label for your opponent. It is not an account and it grants no rights.
         </p>
-        <p className="helper-text mt-2">Online supports 3×3 only.</p>
       </div>
 
       {inviteCode ? (
@@ -89,10 +96,21 @@ export function OnlineLobby({
       ) : null}
 
       <div className="mt-4 grid gap-3">
+        <section className="settings-card" aria-label="Board size">
+          <BoardSizePicker
+            boardSize={boardSize}
+            onChange={onBoardSizeChange}
+            name="online-board-size"
+          />
+          <p className="helper-text mt-2">
+            Both players share this board. The size is fixed once the room exists.
+          </p>
+        </section>
+
         <button
           type="button"
           onClick={onCreate}
-          disabled={busy}
+          disabled={busy || !sizeValid}
           className="btn btn-primary w-full"
         >
           <Bot className="size-4" aria-hidden="true" />

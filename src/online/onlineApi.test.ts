@@ -32,6 +32,43 @@ describe('parseOnlineRoomState', () => {
     const broken = { ...payload, room: { ...payload.room, board: new Array(5).fill(null) } }
     expect(parseOnlineRoomState(broken)).toBeNull()
   })
+
+  it('reads the room geometry and checks the board against it', () => {
+    const payload = makeRoomPayload()
+    const large = {
+      ...payload,
+      room: {
+        ...payload.room,
+        rows: 6,
+        cols: 6,
+        winLength: 4,
+        board: new Array(36).fill(null),
+      },
+    }
+
+    const state = parseOnlineRoomState(large)
+    expect(state?.room.rows).toBe(6)
+    expect(state?.room.cols).toBe(6)
+    expect(state?.room.winLength).toBe(4)
+    expect(state?.room.board).toHaveLength(36)
+
+    // A board that does not fit the announced geometry is rejected.
+    const mismatched = { ...large, room: { ...large.room, board: new Array(9).fill(null) } }
+    expect(parseOnlineRoomState(mismatched)).toBeNull()
+  })
+
+  it('treats a room without geometry as the classic 3x3', () => {
+    const payload = makeRoomPayload()
+    const legacy = {
+      ...payload,
+      room: { ...payload.room, rows: undefined, cols: undefined, winLength: undefined },
+    }
+
+    const state = parseOnlineRoomState(legacy)
+    expect(state?.room.rows).toBe(3)
+    expect(state?.room.cols).toBe(3)
+    expect(state?.room.winLength).toBe(3)
+  })
 })
 
 describe('error mapping', () => {
@@ -58,12 +95,25 @@ describe('api calls', () => {
     const supabase = createFakeSupabase()
     supabase.onRpc('create_online_room', () => makeRoomPayload())
 
-    const state = await createOnlineRoom(supabase.client, 'Alice')
+    const state = await createOnlineRoom(supabase.client, 'Alice', {
+      rows: 3,
+      cols: 3,
+      winLength: 3,
+    })
     expect(state.room.joinCode).toBe('ABCD1234')
     expect(supabase.rpcCalls[0]).toEqual({
       name: 'create_online_room',
-      args: { p_display_name: 'Alice' },
+      args: { p_display_name: 'Alice', p_rows: 3, p_cols: 3 },
     })
+  })
+
+  it('refuses to create a room on an unsupported size', async () => {
+    const supabase = createFakeSupabase()
+
+    await expect(
+      createOnlineRoom(supabase.client, 'Alice', { rows: 11, cols: 11, winLength: 5 }),
+    ).rejects.toMatchObject({ code: 'invalid_board_size' })
+    expect(supabase.rpcCalls).toHaveLength(0)
   })
 
   it('normalises the join code before sending it', async () => {

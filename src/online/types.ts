@@ -2,7 +2,7 @@
  * Types for the online multiplayer mode.
  *
  * These mirror the JSON payload produced by the PostgreSQL functions in
- * `supabase/migrations/0001_online_multiplayer.sql`.
+ * `supabase/migrations/`.
  *
  * The row shapes are derived from `database.types.ts`, which is generated
  * straight from the live schema with:
@@ -26,6 +26,10 @@ export interface OnlineRoom {
   id: RoomRow['id']
   joinCode: RoomRow['join_code']
   status: OnlineRoomStatus
+  /** Board geometry, chosen by the creator and fixed for the whole room. */
+  rows: RoomRow['rows']
+  cols: RoomRow['cols']
+  winLength: RoomRow['win_length']
   board: Cell[]
   currentTurn: Player
   winnerSymbol: Player | null
@@ -93,6 +97,7 @@ export type OnlineErrorCode =
   | 'stale_version'
   | 'cell_taken'
   | 'invalid_cell'
+  | 'invalid_board_size'
   | 'invalid_move_id'
   | 'code_generation_failed'
   | 'network'
