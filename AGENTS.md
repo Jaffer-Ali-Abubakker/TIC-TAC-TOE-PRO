@@ -40,12 +40,13 @@ Everything below was actually executed in this workspace, not merely planned.
 | Tests | `npm run test:run` | ✅ **281 tests / 14 files, all passing** |
 | Database tests | `npm run test:db` | ✅ **44 tests** — the real migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (305 kB JS / 95 kB gzip + a 214 kB lazy Supabase chunk, 39 kB CSS) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (308 kB JS / 96 kB gzip + a 214 kB lazy Supabase chunk, 43 kB CSS) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
 | Horizontal overflow @ 320 px | headless Chrome harness | ✅ `clientWidth 314 / scrollWidth 314` on a 320 px viewport — none, in every mode and on 3×3 / 4×4 / 10×10 |
 | Laptop viewport fit (TIC-003) | Playwright on the preview build | ✅ 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768, 1280×720 — page and centre column never scroll and the score row plus Restart/New Match stay inside the viewport (board 480 / 480 / 480 / 436 / 304 / 256 px) |
+| Sound + arcade motion (TIC-004) | Playwright on the preview build + `npm run test:run` | ✅ 10 Web Audio sounds (sweep, low-pass, reverb, tremolo, one mute flag), elastic pop, shockwave per mark colour, 180 ms board kick, lime→cyan laser line, 18 confetti, score bounce + `+1`, spring banner; reduced motion collapses every duration to `1e-06s`; 320 px stays `314/314` with the confetti mid-air |
 | Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 2 migrations recorded |
 | Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
 | **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
@@ -657,7 +658,10 @@ Rules that must be preserved:
 - X and O differ by **shape** (cross vs. circle) as well as colour.
 - Every interactive element has a visible focus ring; hover effects only apply to controls that
   can actually be used.
-- Reduced motion is honoured globally.
+- Reduced motion is honoured globally: the pop, the shockwave, the board kick, the breathing
+  borders, the laser, the confetti and the score bounce all collapse to a single frame (the last
+  `@media (prefers-reduced-motion: reduce)` block sets `animation-duration: 0.001ms`), while the
+  mark still appears instantly at `opacity: 1`.
 
 ---
 
@@ -1222,6 +1226,6 @@ The exact steps are in the README under *Online multiplayer setup*.
 
 ---
 
-*Last verified: 2026-11-04 — Windows 11, Node v22.23.2, npm 10.9.8.
+*Last verified: 2026-11-09 — Windows 11, Node v22.23.2, npm 10.9.8.
 281/281 tests passing (incl. 44 database tests on a real PostgreSQL engine) · typecheck clean ·
 lint clean · production build clean.*
