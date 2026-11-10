@@ -28,6 +28,7 @@ const ERROR_MESSAGES: Record<OnlineErrorCode, string> = {
   room_not_found: 'No room with that code was found. Check the code and try again.',
   room_expired: 'That room has expired. Create a new one instead.',
   room_finished: 'That match has already finished.',
+  room_closed: 'This room is closed or the host left. Ask the host for a new link.',
   room_full: 'That room is already full - two players are seated.',
   already_in_room: 'You already have a seat in this room.',
   not_a_member: 'You are not a player of this room.',

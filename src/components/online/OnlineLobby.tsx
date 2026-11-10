@@ -4,6 +4,7 @@ import { BoardSizePicker } from '../BoardSizePicker'
 import { normaliseBoardSize } from '../../game/gameLogic'
 import type { BoardSize } from '../../game/types'
 import { formatRoomCode, isValidRoomCode, normalizeRoomCode } from '../../online/roomCode'
+import { type RoomPermissions, type RoomRole } from '../../online/permissions'
 
 export interface OnlineLobbyProps {
   displayName: string
@@ -12,8 +13,13 @@ export interface OnlineLobbyProps {
   onBoardSizeChange: (rows: number, cols: number) => void
   busy: boolean
   error: string | null
+  role: RoomRole
+  permissions: RoomPermissions
+  hostLeft: boolean
+  notice?: string | null
   /** A room code that arrived through an invite link. */
-  inviteCode: string | null
+  inviteCode?: string | null
+  onDismissInvite?: () => void
   onCreate: () => void
   onJoin: (code: string) => void
 }
@@ -26,7 +32,11 @@ export function OnlineLobby({
   onBoardSizeChange,
   busy,
   error,
+  permissions,
+  hostLeft,
+  notice,
   inviteCode,
+  onDismissInvite,
   onCreate,
   onJoin,
 }: OnlineLobbyProps) {
@@ -74,6 +84,22 @@ export function OnlineLobby({
         </p>
       </div>
 
+      {notice ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border-2 border-lime bg-lime/10 px-3 py-2 text-sm text-lime"
+        >
+          {notice}
+        </div>
+      ) : hostLeft ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border-2 border-rose bg-rose/10 px-3 py-2 text-sm text-rose"
+        >
+          Host left the room. This invite link is now invalid. You are back in the lobby.
+        </div>
+      ) : null}
+
       {inviteCode ? (
         <div className="mt-4 rounded-lg border-2 border-lime bg-lime/10 p-3">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-lime">
@@ -83,39 +109,53 @@ export function OnlineLobby({
           <p className="mt-1 font-mono text-lg tracking-widest text-text">
             {formatRoomCode(inviteCode)}
           </p>
-          <button
-            type="button"
-            onClick={() => onJoin(inviteCode)}
-            disabled={busy}
-            className="btn btn-secondary mt-3 w-full"
-          >
-            <LogIn className="size-4" aria-hidden="true" />
-            Join this room
-          </button>
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            You are joining as Guest (O) - you can only play and leave.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onJoin(inviteCode)}
+              disabled={busy}
+              className="btn btn-secondary flex-1"
+            >
+              <LogIn className="size-4" aria-hidden="true" />
+              Join this room
+            </button>
+            {onDismissInvite ? (
+              <button type="button" onClick={onDismissInvite} className="btn btn-ghost">
+                Back to lobby
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       <div className="mt-4 grid gap-3">
-        <section className="settings-card" aria-label="Board size">
-          <BoardSizePicker
-            boardSize={boardSize}
-            onChange={onBoardSizeChange}
-            name="online-board-size"
-          />
-          <p className="helper-text mt-2">
-            Both players share this board. The size is fixed once the room exists.
-          </p>
-        </section>
+        {inviteCode ? null : (
+          <section className="settings-card" aria-label="Board size">
+            <BoardSizePicker
+              boardSize={boardSize}
+              onChange={onBoardSizeChange}
+              name="local-board-size"
+            />
+            <p className="helper-text mt-2">
+              Both players share this board. The size is fixed once the room exists.
+            </p>
+          </section>
+        )}
 
-        <button
-          type="button"
-          onClick={onCreate}
-          disabled={busy || !sizeValid}
-          className="btn btn-primary w-full"
-        >
-          <Bot className="size-4" aria-hidden="true" />
-          Create private room
-        </button>
+        {permissions.canCreateRoom && !inviteCode ? (
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={busy || !sizeValid}
+            className="btn btn-primary w-full"
+          >
+            <Bot className="size-4" aria-hidden="true" />
+            Create private room
+          </button>
+        ) : null}
 
         <div className="panel-inset p-3">
           <label htmlFor="online-room-code" className="block text-[13px] font-medium text-muted">

@@ -37,10 +37,10 @@ Everything below was actually executed in this workspace, not merely planned.
 | --- | --- | --- |
 | Types | `npm run typecheck` | ✅ passes, 0 errors |
 | Lint | `npm run lint` | ✅ passes, 0 problems |
-| Tests | `npm run test:run` | ✅ **295 tests / 14 files, all passing** |
-| Database tests | `npm run test:db` | ✅ **51 tests** — every migration on a real PostgreSQL engine |
+| Tests | `npm run test:run` | ✅ **314 tests / 15 files, all passing** |
+| Database tests | `npm run test:db` | ✅ **56 tests** — every migration on a real PostgreSQL engine |
 | Coverage | `npm run test:coverage` | ✅ ~88 % stmts · ~93 % lines · ~97 % funcs |
-| Build | `npm run build` | ✅ succeeds → `dist/` (310 kB JS / 96 kB gzip + a 214 kB lazy Supabase chunk, 44 kB CSS) |
+| Build | `npm run build` | ✅ succeeds → `dist/` (314 kB JS / 97 kB gzip + a 214 kB lazy Supabase chunk, 44 kB CSS) |
 | Dev server | `npm run dev` | ✅ verified serving HTTP 200 on `http://localhost:5173/` |
 | Preview server | `npm run preview` | ✅ verified serving the production build |
 | Visual QA | headless Chrome (§16) | ✅ desktop 1400 px, mobile 320 px, local modes, online lobby, waiting room, active match, all dialogs, board sizes 3×3 / 4×4 / 10×10 |
@@ -48,7 +48,8 @@ Everything below was actually executed in this workspace, not merely planned.
 | Laptop viewport fit (TIC-003) | Playwright on the preview build | ✅ 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768, 1280×720 — page and centre column never scroll and the score row plus Restart/New Match stay inside the viewport (board 480 / 480 / 480 / 436 / 304 / 256 px) |
 | Sound + arcade motion (TIC-004) | Playwright on the preview build + `npm run test:run` | ✅ 10 Web Audio sounds (sweep, low-pass, reverb, tremolo, one mute flag), elastic pop, shockwave per mark colour, 180 ms board kick, lime→cyan laser line, 18 confetti, score bounce + `+1`, spring banner; reduced motion collapses every duration to `1e-06s`; 320 px stays `314/314` with the confetti mid-air |
 | Online board size (TIC-005) | Playwright on the dev server + the hosted database | ✅ lobby picker (presets + steppers, `6×6 • 4 to win`, `10×10 • 5 to win`), a 6×6 room created and joined by a second browser context (36 cells each side), a move applied and seen by both, a 10×10 room (100 cells, 38 px each at 1400 px) with the waiting-room badge and 100-dot preview; `320/320` and `369/369` at 320/375 px, `1280/1280 · 720/720` at 1280×720 |
-| Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 3 migrations recorded |
+| Room permissions (TIC-006) | Playwright (host + guest contexts on the dev server) + `npm run test:db` + `npm run test:run` | ✅ role derived from `is_owner` (never localStorage); guest sees no create/copy/share/start-rematch (0 create, 0 copy buttons live); host leave → `status=closed`, link dead, guest banner then lobby with the `?room=` param gone; guest leave → seat freed, room back to `waiting` with the same code and the "Opponent left" notice; third visitor `online:room_full` (database test - the live third context hit the sign-in rate limit); 314 tests / 15 files incl. 56 database tests |
+| Hosted database | `npm run verify:db` | ✅ 3 tables · 7 functions · 3 policies · RLS on all · 0 functions without `search_path` · `online_room_payload` locked · 4 migrations recorded |
 | Database advisors | `supabase db advisors` | ✅ 0 security advisories, 0 unindexed foreign keys |
 | **Live deployment** | `https://tic-tac-toe-pro-eosin.vercel.app/` | ✅ serves this build, correct env vars baked in |
 | **Live two-player match** | two Chrome profiles via CDP (§16) | ✅ create → invite → join → move each way; both boards converged on `X...O....`; DB recorded `status=active, version=4, 2 seats, 2 moves` |
@@ -86,6 +87,7 @@ older Vercel project that still owns `tic-tac-toe-pro.vercel.app`. See §21.
 | RLS + restricted grants | migration sections 5 & 6 | `supabase/tests/online_multiplayer.test.ts` "direct table writes" |
 | Idempotent retries | `online_moves(room_id, move_id)` unique | `supabase/tests/online_multiplayer.test.ts` |
 | Rematch requires both players | `public.request_online_rematch` | `supabase/tests/online_multiplayer.test.ts` "rematch" |
+| Room permissions (TIC-006) | `src/online/permissions.ts`, `useOnlineRoom` (`role`/`permissions`/`hostLeft`), `0004_online_room_permissions.sql` | `permissions.test.ts`, `useOnlineRoom.test.tsx` "room roles and permissions", `App.online.test.tsx` "room permissions" |
 | Reconnect recovery | `src/online/useOnlineRoom.ts` | `src/online/useOnlineRoom.test.tsx` |
 | Missing config does not break offline play | `src/online/config.ts` | `src/App.online.test.tsx` "missing configuration" |
 | Sound toggle (Web Audio) | `src/utils/sound.ts` | `src/utils/sound.test.ts` |
@@ -254,6 +256,7 @@ share, leave) · `OnlinePlayersBar.tsx` (both players + connection status) ·
 | `migrations/0001_online_multiplayer.sql` | The whole backend: tables, constraints, helper functions, the six client-facing RPCs, RLS policies, grants, the realtime publication and the private channel policy. |
 | `migrations/0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key (Postgres does not index FKs automatically). |
 | `migrations/0003_online_board_size.sql` | Room geometry: `rows`, `cols`, `win_length` (default 3, so old rooms stay 3×3), geometry-aware constraints, `online_win_length()`, a generic `online_winning_combination(board, rows, cols, win)`, `online_board_is_full(board, rows, cols)` and the geometry in every RPC payload (`create_online_room(name, rows, cols)`). |
+| `migrations/0004_online_room_permissions.sql` | The `closed` room status, a role-aware `leave_online_room` (host closes, guest frees the seat and returns the room to `waiting`) and `join_online_room` refusing a closed room with `online:room_closed`. Also documents why the second-room guard is client side. |
 | `config.toml` | Supabase CLI project configuration (anonymous sign-in and realtime authorization are enabled). |
 | `tsconfig.json` | TypeScript config for the SQL test files (they need the Node types). |
 | `tests/harness.ts` | Runs **all** migrations, in filename order, on PGlite with a small Supabase shim (`auth.users`, `auth.uid()`, the `authenticated`/`anon`/`service_role` roles). `readMigrations()` is what keeps the tests honest when a migration is added. |
@@ -317,9 +320,46 @@ pinned by `skills-lock.json`. See §15 for when **not** to use them.
 | Move based on an outdated board | Rejected (`online:stale_version`) |
 | The same move id sent twice | Applied **once** (idempotent) |
 | Rematch | Only starts once **both** players have requested it; the X symbol **alternates** |
-| A player leaves an active match | The match ends; **no forfeit win is awarded** |
-| The owner leaves a waiting room | The room expires |
+| A player leaves an active match | No forfeit win is awarded (see the permissions block below) |
+| The owner leaves a waiting room | The room is **closed** (`status = 'closed'`), the code can never be used again |
 | A room is older than 2 hours | Expired (by `online_expire_rooms()`) |
+
+### Room permissions (TIC-006)
+
+**Roles are derived from the database, never stored locally.** The owner seat is
+`online_room_players.is_owner` (the creator), which survives the symbol swap of a
+rematch; a seat that is not the owner is a guest. `useOnlineRoom` computes
+`role: 'host' | 'guest' | null` from that flag plus the session's `userId`, and
+`getPermissions(role, status)` in `src/online/permissions.ts` is the single
+matrix. `localStorage` never decides a role, so refreshing or editing storage can
+never promote a guest.
+
+| Permission | Host | Guest | Spectator (no seat, room open) | Lobby |
+| --- | --- | --- | --- | --- |
+| `canCreateRoom` | no (already in one) | no | no | **yes** |
+| `canJoin` | no | no | no | **yes** |
+| `canCopyCode` / `canCopyLink` / `canShare` | **yes** | no | no | no |
+| `canPlay` | yes (`active`) | yes (`active`) | no | no |
+| `canLeave` | **yes** | **yes** | yes | no |
+| `canStartRematch` | yes (`finished`) | no | no | no |
+| `canAcceptRematch` | yes (`finished`) | **yes** (`finished`) | no | no |
+| `canChangeBoardSize` | no (locked at creation) | no | no | **yes** |
+| `canDeleteRoom` | yes (= leaving closes it) | no | no | no |
+| `canKick` | no (v1) | no | no | no |
+
+Behaviour:
+
+| Situation | Behaviour |
+| --- | --- |
+| Host leaves | `leave_online_room` sets `status = 'closed'`; the guest's seat stays so its client can read the closure, every future join gets `online:room_closed`, and the guest client shows "Host left the room" for `HOST_LEFT_RETURN_MS` (3 s) then drops to the lobby. **The guest is never promoted.** |
+| Guest leaves | The guest row is deleted and the room goes back to `waiting` with its board reset, the same code and the host still seated - the host can invite somebody else |
+| Both leave | The room is closed and the code is dead |
+| Guest refreshes | The role is re-derived from `is_owner` (not from storage) |
+| A seated player calls `createRoom` | `useOnlineRoom.createRoom` refuses it client-side (`online:already_in_room`). The database deliberately does **not** hard-block it: an abandoned waiting room would otherwise lock a user out for two hours. The hourly rate limit still caps abuse. |
+| A third visitor joins a full room | `online:room_full` |
+| The guest opens a different `?room=` while seated | `useOnlineRoom.joinRoom` refuses with `online:already_in_room` |
+
+Room statuses: `waiting`, `active`, `finished`, `expired`, `closed`.
 
 ### AI behaviour
 
@@ -692,7 +732,7 @@ Rules that must be preserved:
 
 ## 13. Testing strategy
 
-295 tests in 14 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
+314 tests in 15 files. `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`, cleans up
 after each test and polyfills `matchMedia` / `scrollTo`.
 
 | Suite | Focus |
@@ -703,11 +743,12 @@ after each test and polyfills `matchMedia` / `scrollTo`.
 | `src/utils/storage.test.ts` | Validation, field repair, the v1 → v2 → v3 migrations, a persisted board size (and its repair), the shape of a big board history entry, corrupted JSON, blocked `localStorage`. |
 | `src/utils/sound.test.ts` | The X sweep ends at 880 Hz, O goes through a low-pass, the win is a four-note arpeggio with one convolver, the draw adds LFOs, every one of the ten names plays without throwing, the mute flag silences and restores, the hover tick is throttled to one per 100 ms, and the engine survives a missing API, missing filters/convolver or a throwing oscillator. |
 | `src/online/roomCode.test.ts` | Code normalisation and validation, formatting, invite link build/parse, display name sanitising, move id format. |
+| `src/online/permissions.test.ts` | The permission matrix for lobby / host / guest / spectator, rematch asymmetry and the closed-room block. |
 | `src/online/config.test.ts` | Missing variables, malformed URLs, valid configuration, the app URL fallback. |
 | `src/online/onlineApi.test.ts` | Payload validation (including the room geometry and a board that does not fit it), the `online:<code>` → friendly message mapping, the exact RPC arguments, error conversion. |
-| `src/online/useOnlineRoom.test.tsx` | Create / join / leave, creating a room on a chosen size, invalid codes, friendly errors, move submission with the right version, **move id reuse on retry**, the turn guard, the version guard, the realtime subscription, refresh on a realtime event, subscription cleanup. |
+| `src/online/useOnlineRoom.test.tsx` | Create / join / leave, creating a room on a chosen size, invalid codes, friendly errors, move submission with the right version, **move id reuse on retry**, the turn guard, the version guard, the realtime subscription, refresh on a realtime event, subscription cleanup, then "room roles and permissions": host derived from `is_owner`, guest derived from the database, second-room refusal, and the host-left return to the lobby. |
 | `src/App.test.tsx` | The local modes end to end, including the board size pills (preset switch + persistence), the "Change board size?" confirmation with the confirm and the `Escape` cancel path, and the custom rows/columns steppers. |
-| `src/App.online.test.tsx` | The online lobby, room creation on a chosen board size, joining a room of any size (36 cells on a 6×6), invite links, the setup notice, rematch and the connection status. |
+| `src/App.online.test.tsx` | The online lobby, room creation on a chosen board size, joining a room of any size (36 cells on a 6×6), invite links, the setup notice, rematch and the connection status, plus "room permissions": host copy controls, the guest invite card with no create/copy, guest-only "Accept rematch" and the host-left banner. |
 | `supabase/tests/online_multiplayer.test.ts` | Every migration on a real PostgreSQL engine: unauthenticated rejection, seat allocation, the third player, a non-member, direct writes, illegal moves, idempotency, win/draw detection, rematch, leaving, the expiry sweep, and the board size block (geometry stored, win length derived, 4 in a row on a 6×6, cell 99 on a 10×10, a rematch keeping the size, invalid sizes rejected). |
 | `supabase/tests/online_multiplayer_sql.test.ts` | Runs the SQL editor script from start to finish and checks that it cleans up. |
 
@@ -759,6 +800,7 @@ UI shows for it:
 | `online:room_not_found` | No such room | "No room with that code was found…" |
 | `online:room_expired` | The room is older than 2 hours | "That room has expired…" |
 | `online:room_finished` | The match is already over | "That match has already finished." |
+| `online:room_closed` | The host left / the room was closed | "This room is closed or the host left. Ask the host for a new link." |
 | `online:room_full` | Two players are seated | "That room is already full…" |
 | `online:already_in_room` | The caller already has a seat | "You already have a seat in this room." |
 | `online:not_a_member` | The caller is not in the room | "You are not a player of this room." |
@@ -991,6 +1033,44 @@ the database (`rows 6 / cols 6 / win_length 4 / 36 cells / 2 seats`). Sizes: `32
 > The online stage scrolls **internally** at 900 px and below (the players bar is taller than the
 > local score row), so `.board-stage` `scrollHeight > clientHeight` there. The gate that must hold is
 > the **page**: `document.documentElement.scrollHeight === clientHeight`.
+
+### The host / guest permission flow (TIC-006)
+
+Same trick, three contexts (host, guest, third visitor). What must be observed:
+
+1. The host creates a room; the waiting room shows **copy code** and **copy invite link** and no
+   create button.
+2. The guest opens `?room=<code>`: an invite card with *"You are joining as Guest (O) - you can only
+   play and leave"*, a **Join this room** button and a **Back to lobby** button - and **no** create,
+   copy or share control.
+3. After joining, both sides render the same number of cells and the guest has **no**
+   "Request rematch" button.
+4. The host leaves: the guest sees *"Host left the room"*, the `?room=` parameter is gone from the
+   URL after the 3 s window, the lobby's create button is back and re-opening the invite answers
+   *"This room is closed or the host left. Ask the host for a new link."*
+5. The guest leaves: the host is back in the waiting room with the **same code**, the
+   *"Opponent left. Waiting for new opponent..."* notice, and the copy buttons.
+6. A third visitor of a full room gets *"That room is already full - two players are seated."*
+
+> **Budget the sign-ins.** Anonymous sign-in is rate limited per IP (the error reads *"Too many
+> sign-in attempts. Please wait a minute and try again."*). Every `newContext()` is a new anonymous
+> user, so a long QA session can lock you out for a while. Create the three contexts **once** per
+> run and drive every scenario inside that single `browser_run_code_unsafe` call.
+
+Verified on the dev server against the hosted database:
+
+- host `6x6` room (`6x6 - 4 to win` badge), 2 copy buttons in the waiting room;
+- guest invite card with the guest banner, 0 create / 0 copy buttons, 36 cells on both sides after
+  joining, 0 "Request rematch";
+- host leaves → guest banner → lobby (URL back to `/`), create button back, dead invite answers
+  *"This room is closed or the host left..."*;
+- guest leaves → host stays in the waiting room, same code, "Opponent left" notice, copy buttons;
+- the **room full** answer was not observed live: the third context hit the anonymous sign-in rate
+  limit. It is covered by the database test (`online:room_full`) and by the friendly-message test;
+- page gates: `1920/1920 h1032/1032`, `1920/1920 h800/800`, `1512/1512 h982/982`,
+  `1440/1440 h900/900`, `1366/1366 h768/768`, `1280/1280 h720/720` with `.stage-actions`
+  bottom inside the viewport (board 544 / 336 / 518 / 436 / 304 / 256 px), `369/369` at 375 px
+  and `314/314` at 320 px; the online lobby obeys the same gates.
 
 ### Driving a real two-player match (no test dependency)
 
@@ -1297,6 +1377,58 @@ the expected version.
 
 ---
 
+**Phase 10 — room permissions (TIC-006)**
+
+- **Roles come from the database.** `online_room_players.is_owner` already existed and is in every
+  payload as `isOwner`; `useOnlineRoom` now derives `role: 'host' | 'guest' | null` from that seat
+  plus the session `userId`, so a refresh (or a hand-edited `localStorage`) can never promote a
+  guest. `src/online/permissions.ts` holds the single matrix: `getPermissions(role, roomStatus)`
+  returns `canCreateRoom`, `canCopyCode`, `canCopyLink`, `canShare`, `canPlay`, `canLeave`,
+  `canStartRematch`, `canAcceptRematch`, `canChangeBoardSize`, `canDeleteRoom` and `canKick`.
+- The guest can **play and leave** (plus accept a rematch the host requested) and nothing else. The
+  host keeps the code, the link, the share sheet, the start-rematch and the "delete" (leaving closes
+  the room). `canKick` is `false` everywhere - there is no kick RPC.
+- `supabase/migrations/0004_online_room_permissions.sql`: widens `online_rooms_status_check` with
+  `'closed'`, rewrites `leave_online_room` to branch on the caller's `is_owner` seat, and makes
+  `join_online_room` answer `online:room_closed` for a closed room. The **host leaves** → the room is
+  `closed` and the guest's seat row stays so its client can read the closure (then every move is
+  `game_not_active`). The **guest leaves** → the seat row is deleted and the room returns to
+  `waiting` with a reset board, the same code, both rematch flags cleared and `version` bumped.
+- `useOnlineRoom` exposes `role`, `permissions`, `hostLeft` and `notice`. `applyState` sets the
+  "Host left the room" message when the applied snapshot is closed and the viewer is the guest, and
+  a `HOST_LEFT_RETURN_MS = 3000` timer then drops the room and puts the guest back in the lobby. A
+  2→1 player transition in `waiting` sets "Opponent left. Waiting for new opponent...", cleared when
+  a second seat appears again. `createRoom` refuses while a room is open and `joinRoom` refuses a
+  *different* code while seated (`online:already_in_room`) - the database deliberately does not
+  hard-block the first case, otherwise an abandoned waiting room would lock a user out for two hours.
+- UI: `OnlineLobby` gates the create button on `permissions.canCreateRoom` and shows the invite card
+  ("You are joining as Guest (O) - you can only play and leave", *Join this room* / *Back to lobby*)
+  with no create or copy control; `OnlineWaitingRoom` shows the copy/share buttons to the host only
+  and a read-only code plus "You joined room ... as guest (O)" to the guest; `OnlineActions` gives
+  the guest a disabled "Accept rematch" (enabled only when the host asked) and role-specific leave
+  text. `App` gained the "Host left the room" panel, `inviteCode` is now state with
+  `dismissInvite()` (so the `?room=` param is actually cleared), and `playableRoom` gates the board
+  and the actions on `active | finished`.
+- 19 new tests (314 total / 15 files, 56 database): the full permission matrix
+  (`permissions.test.ts`), host/guest role derivation, the second-room refusal and the host-left
+  return (`useOnlineRoom.test.tsx`), the host copy controls, the guest invite card, the guest-only
+  "Accept rematch" and the host-left banner (`App.online.test.tsx`), plus the database tests for
+  host-leave-closes, guest-leave-returns-to-waiting, closed-room join, mid-match host leave and the
+  owner flag.
+- `0004` was pushed to the hosted project; `npm run verify:db` expects **4** recorded migrations and
+  the regenerated `database.types.ts` is unchanged (the status column is still `text`).
+- Live QA on the dev server with a host + guest browser context: 6×6 room, guest banner with
+  0 create / 0 copy buttons, 36 cells on both sides, host leave → guest banner → lobby with the
+  `?room=` param removed and the create button back, dead invite answering "This room is closed or
+  the host left", guest leave → host waiting with the same code and the "Opponent left" notice.
+  The third-visitor "room full" check is covered by the database test: the extra context hit the
+  anonymous sign-in rate limit (see §16).
+- Viewport gates: `1920/1920 h1032/1032`, `1920/1920 h800/800`, `1512/1512 h982/982`,
+  `1440/1440 h900/900`, `1366/1366 h768/768`, `1280/1280 h720/720` with `.stage-actions` inside
+  the viewport, `369/369` at 375 px and `314/314` at 320 px, in the local modes and the online lobby.
+
+---
+
 ## 21. What is still unverified
 
 These need **your** accounts and cannot be checked from this workspace:
@@ -1323,6 +1455,6 @@ The exact steps are in the README under *Online multiplayer setup*.
 
 ---
 
-*Last verified: 2026-11-09 — Windows 11, Node v22.23.2, npm 10.9.8.
-295/295 tests passing (incl. 51 database tests on a real PostgreSQL engine) · typecheck clean ·
-lint clean · production build clean · hosted database verified after `0003`.*
+*Last verified: 2026-11-10 — Windows 11, Node v22.23.2, npm 10.9.8.
+314/314 tests passing (incl. 56 database tests on a real PostgreSQL engine) · typecheck clean ·
+lint clean · production build clean · hosted database verified after `0004`.*

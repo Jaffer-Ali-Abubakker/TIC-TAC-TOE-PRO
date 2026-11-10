@@ -82,9 +82,18 @@ export default function App() {
   const onlineConfig = useMemo(() => readOnlineConfig(), [])
 
   /** The room code from an invite link, if the page was opened with one. */
-  const inviteCode = useMemo(() => {
+  const [inviteCode, setInviteCode] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return parseRoomCodeFromUrl(window.location.href)
+  })
+
+  const dismissInvite = useCallback(() => {
+    if (typeof window === 'undefined') return
+    setInviteCode(null)
+    // Remove the ?room= param from the URL without reloading.
+    const url = new URL(window.location.href)
+    url.searchParams.delete('room')
+    window.history.replaceState({}, '', url.toString())
   }, [])
 
   const computerSymbol = getComputerSymbol(state)
@@ -148,6 +157,20 @@ export default function App() {
   useEffect(() => {
     if (inviteCode) dispatch({ type: 'setMode', mode: 'online' })
   }, [inviteCode])
+
+  // When the host leaves, the invite link becomes invalid. Drop it from the
+  // URL (an external system) and forget the code once the room snapshot is
+  // gone, so the guest lands in a clean lobby with the create button back.
+  useEffect(() => {
+    if (!online.hostLeft || typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('room')) {
+      url.searchParams.delete('room')
+      window.history.replaceState({}, '', url.toString())
+    }
+    const timer = window.setTimeout(() => setInviteCode(null), 0)
+    return () => window.clearTimeout(timer)
+  }, [online.hostLeft])
 
   // The database is the authority: apply the authoritative snapshot.
   const onlineRoom = online.room
@@ -277,6 +300,7 @@ export default function App() {
           confirmLabel: 'Leave room',
           destructive: true,
           action: () => {
+            dismissInvite()
             void online.leaveRoom()
             dispatch({ type: 'setMode', mode })
           },
@@ -301,7 +325,7 @@ export default function App() {
       }
       dispatch({ type: 'setMode', mode })
     },
-    [state, online, requestConfirm],
+    [state, online, requestConfirm, dismissInvite],
   )
 
   const handleDifficultyChange = useCallback((difficulty: Difficulty) => {
@@ -407,9 +431,10 @@ export default function App() {
   const onlineStatus = onlineRoomState?.room.status ?? null
   const waitingForOpponent = isOnline && onlineStatus === 'waiting'
   const endedWithoutWinner = isOnline && onlineStatus === 'finished' && !onlineRoomState?.room.result
+  const playableRoom = onlineStatus === 'active' || onlineStatus === 'finished'
   // The board (and its status row) is hidden while the online lobby asks for a room.
   const showBoard =
-    !isOnline || (onlineConfig.ok && onlineRoomState !== null && !waitingForOpponent)
+    !isOnline || (onlineConfig.ok && onlineRoomState !== null && playableRoom)
 
   const boardInteractive = isOnline
     ? state.status === 'playing' &&
@@ -494,10 +519,24 @@ export default function App() {
               onBoardSizeChange={handleBoardSizeChange}
               busy={online.busy}
               error={online.error}
+              role={online.role}
+              permissions={online.permissions}
+              hostLeft={online.hostLeft}
+              notice={online.notice}
               inviteCode={inviteCode}
+              onDismissInvite={dismissInvite}
               onCreate={() => void online.createRoom(state.boardSize)}
               onJoin={(code) => void online.joinRoom(code)}
             />
+          ) : isOnline && online.hostLeft ? (
+            <div className="panel p-4 sm:p-6 text-center" role="alert">
+              <div className="rounded-lg border-2 border-rose bg-rose/10 px-3 py-4">
+                <p className="text-rose font-medium">Host left the room</p>
+                <p className="mt-1 text-sm text-muted">
+                  This invite link is now invalid. Returning to lobby...
+                </p>
+              </div>
+            </div>
           ) : isOnline && waitingForOpponent ? (
             <>
               <OnlinePlayersBar
@@ -513,8 +552,13 @@ export default function App() {
                 roomCode={onlineRoomState?.room.joinCode ?? ''}
                 inviteLink={online.inviteLink}
                 boardSize={state.boardSize}
+                role={online.role}
+                notice={online.notice}
                 busy={online.busy}
-                onLeave={() => void online.leaveRoom()}
+                onLeave={() => {
+                  dismissInvite()
+                  void online.leaveRoom()
+                }}
               />
             </>
           ) : isOnline ? (
@@ -552,14 +596,18 @@ export default function App() {
             {isOnline &&
             onlineConfig.ok &&
             onlineRoomState &&
-            onlineStatus !== 'waiting' ? (
+            playableRoom ? (
               <OnlineActions
                 busy={online.busy}
                 canRematch={onlineStatus === 'finished'}
                 iRequestedRematch={online.iRequestedRematch}
                 opponentRequestedRematch={online.opponentRequestedRematch}
+                role={online.role}
                 onRequestRematch={() => void online.requestRematch()}
-                onLeave={() => void online.leaveRoom()}
+                onLeave={() => {
+                  dismissInvite()
+                  void online.leaveRoom()
+                }}
               />
             ) : null}
             {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (

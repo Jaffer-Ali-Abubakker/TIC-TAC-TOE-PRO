@@ -700,7 +700,7 @@ describe('rematch', () => {
 })
 
 describe('leaving a room', () => {
-  it('expires a waiting room when the owner leaves', async () => {
+  it('closes the room when the host leaves', async () => {
     const created = await createRoom()
     await rpc(`select public.leave_online_room($1)`, [created.room.joinCode])
 
@@ -708,23 +708,74 @@ describe('leaving a room', () => {
       `select status from public.online_rooms where id = $1`,
       [created.room.id],
     )
-    expect(rows[0].status).toBe('expired')
+    expect(rows[0].status).toBe('closed')
+
+    // The invite link is dead: nobody can join that code any more.
+    await database.setUser(BOB)
+    const error = await expectRpcError(database, `select public.join_online_room($1, 'Bob')`, [
+      created.room.joinCode,
+    ])
+    expect(error).toBe('online:room_closed')
   })
 
-  it('ends an active match without awarding a forfeit win', async () => {
+  it('sends the guest back to the waiting room when they leave', async () => {
     const created = await createRoom()
     await database.setUser(BOB)
     await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
 
+    await rpc(`select public.leave_online_room($1)`, [created.room.joinCode])
+
+    const { rows } = await database.query<{
+      status: string
+      result: string | null
+      moves_played: number
+      seats: number
+    }>(
+      `select status, result, moves_played,
+              (select count(*) from public.online_room_players p where p.room_id = r.id) as seats
+         from public.online_rooms r where r.id = $1`,
+      [created.room.id],
+    )
+    // The host keeps the room, its code and their seat.
+    expect(rows[0].status).toBe('waiting')
+    expect(rows[0].seats).toBe(1)
+    expect(rows[0].result).toBeNull()
+    expect(rows[0].moves_played).toBe(0)
+
+    // A new opponent can take the freed seat with the same code.
+    await database.setUser(CAROL)
+    const joined = await rpc(`select public.join_online_room($1, 'Carol')`, [created.room.joinCode])
+    expect(joined.room.status).toBe('active')
+    expect(joined.players).toHaveLength(2)
+  })
+
+  it('closes the room when the host leaves an active match', async () => {
+    const created = await createRoom()
     await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+
+    await database.setUser(ALICE)
     await rpc(`select public.leave_online_room($1)`, [created.room.joinCode])
 
     const { rows } = await database.query<{ status: string; result: string | null }>(
       `select status, result from public.online_rooms where id = $1`,
       [created.room.id],
     )
-    expect(rows[0].status).toBe('finished')
+    expect(rows[0].status).toBe('closed')
     expect(rows[0].result).toBeNull()
+
+    // The guest can still read the snapshot (that is how it learns the host
+    // left) but can no longer play.
+    await database.setUser(BOB)
+    const state = await rpc(`select public.get_online_room_state($1)`, [created.room.joinCode])
+    expect(state.room.status).toBe('closed')
+
+    const moveError = await expectRpcError(
+      database,
+      `select public.submit_online_move($1, 0, $2, gen_random_uuid())`,
+      [created.room.joinCode, state.room.version],
+    )
+    expect(moveError).toBe('online:game_not_active')
   })
 
   it('refuses a leave from a non member', async () => {
@@ -734,6 +785,61 @@ describe('leaving a room', () => {
       created.room.joinCode,
     ])
     expect(error).toBe('online:not_a_member')
+  })
+})
+
+describe('room permissions', () => {
+  it('marks the creator as the only owner', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    const joined = await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+
+    const owners = joined.players.filter((player) => player.isOwner)
+    expect(owners).toHaveLength(1)
+    expect(owners[0].userId).toBe(ALICE)
+    expect(joined.mySymbol).toBe('O')
+  })
+
+  it('turns a third visitor away as room full', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+
+    await database.setUser(CAROL)
+    const error = await expectRpcError(database, `select public.join_online_room($1, 'Carol')`, [
+      created.room.joinCode,
+    ])
+    expect(error).toBe('online:room_full')
+  })
+
+  it('keeps the already joined guest seated when they re-open the link', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+
+    // Re-opening the invite link is `already_in_room`, not a second seat and
+    // never a promotion to host.
+    const error = await expectRpcError(database, `select public.join_online_room($1, 'Bob')`, [
+      created.room.joinCode,
+    ])
+    expect(error).toBe('online:already_in_room')
+
+    const state = await rpc(`select public.get_online_room_state($1)`, [created.room.joinCode])
+    expect(state.mySymbol).toBe('O')
+    expect(state.players.find((player: { isOwner: boolean }) => player.isOwner)?.userId).toBe(ALICE)
+  })
+
+  it('does not lock a guest out after the host closes the room', async () => {
+    const created = await createRoom()
+    await database.setUser(BOB)
+    await rpc(`select public.join_online_room($1, 'Bob')`, [created.room.joinCode])
+    await database.setUser(ALICE)
+    await rpc(`select public.leave_online_room($1)`, [created.room.joinCode])
+
+    await database.setUser(BOB)
+    const own = await rpc(`select public.create_online_room('Bob')`)
+    expect(own.mySymbol).toBe('X')
+    expect(own.players[0].isOwner).toBe(true)
   })
 })
 

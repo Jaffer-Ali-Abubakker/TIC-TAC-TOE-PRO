@@ -22,6 +22,7 @@ import {
   toOnlineError,
 } from './onlineApi'
 import { createMoveId, isValidRoomCode, normalizeRoomCode } from './roomCode'
+import { getPermissions, type RoomPermissions, type RoomRole } from './permissions'
 import { getOnlineConfig, getSupabaseClient } from './supabase'
 import { useOnlineSession } from './useOnlineSession'
 import type {
@@ -34,6 +35,9 @@ import type {
 /** How often the authoritative state is re-read as a safety net. */
 const POLL_INTERVAL_MS = 2500
 
+/** How long the guest sees "Host left" before the lobby comes back. */
+export const HOST_LEFT_RETURN_MS = 3000
+
 /** The realtime channel name for a room. */
 export function roomChannelName(roomId: string): string {
   return `online-room:${roomId}`
@@ -43,6 +47,13 @@ export interface OnlineRoomController {
   phase: OnlinePhase
   room: OnlineRoomState | null
   mySymbol: Player | null
+  /** `host` (creator), `guest` (joiner) or `null` when no seat is held. */
+  role: RoomRole
+  permissions: RoomPermissions
+  /** The host closed the room: the guest is about to be sent back to the lobby. */
+  hostLeft: boolean
+  /** A transient message for the room (for example "Opponent left"). */
+  notice: string | null
   /** The authenticated (anonymous) user id of this browser. */
   userId: string | null
   connection: OnlineConnectionStatus
@@ -81,6 +92,7 @@ export function useOnlineRoom(): OnlineRoomController {
   const [busy, setBusy] = useState(false)
   const [displayName, setDisplayNameState] = useState(() => loadDisplayName())
   const [opponentPresent, setOpponentPresent] = useState<boolean | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const roomRef = useRef<OnlineRoomState | null>(null)
   const codeRef = useRef<string | null>(null)
@@ -119,7 +131,19 @@ export function useOnlineRoom(): OnlineRoomController {
     roomRef.current = next
     setRoom(next)
     codeRef.current = next.room.joinCode
-  }, [])
+    // The host closed the room: the guest gets the reason here (inside the
+    // snapshot application) and is returned to the lobby by the timer below.
+    const seat = next.players.find((player) => player.userId === userId)
+    if (seat && !seat.isOwner && next.room.status === 'closed') {
+      setError('Host left the room. This invite link is now invalid. Returning to lobby...')
+      setErrorCode('room_closed')
+    }
+    // The guest seat was freed and the host is back in the waiting room.
+    if (next.players.length === 2) setNotice(null)
+    else if (current && current.players.length === 2 && next.room.status === 'waiting') {
+      setNotice('Opponent left. Waiting for new opponent...')
+    }
+  }, [userId])
   const clearError = useCallback(() => {
     setError(null)
     setErrorCode(null)
@@ -176,6 +200,38 @@ export function useOnlineRoom(): OnlineRoomController {
 
   const roomId = room?.room.id ?? null
   const mySymbol = room?.mySymbol ?? null
+
+  // The seat flag comes from the database, so a refresh (or a hand-edited
+  // localStorage) can never turn a guest into the host.
+  const role: RoomRole = useMemo(() => {
+    if (!room) return null
+    const seat = room.players.find((player) => player.userId === userId)
+    if (!seat) return null
+    return seat.isOwner ? 'host' : 'guest'
+  }, [room, userId])
+
+  const hostLeft = role === 'guest' && room?.room.status === 'closed'
+  const permissions = useMemo(
+    () => getPermissions(role, room?.room.status ?? null),
+    [role, room?.room.status],
+  )
+
+  // The host closed the room: the message is set when the closed snapshot is
+  // applied. Here we only schedule the return to the lobby.
+  useEffect(() => {
+    if (!hostLeft) return
+
+    const timer = window.setTimeout(() => {
+      roomRef.current = null
+      codeRef.current = null
+      lastAttemptRef.current = null
+      setRoom(null)
+      setBasePhase('lobby')
+      setOpponentPresent(null)
+    }, HOST_LEFT_RETURN_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [hostLeft])
 
   useEffect(() => {
     if (!roomId || !client || !userId) return
@@ -257,6 +313,14 @@ export function useOnlineRoom(): OnlineRoomController {
 
   const createRoom = useCallback(
     async (boardSize: BoardSize) => {
+      // A player inside a room may not open a second one: only the host owns a
+      // room, and the database enforces the same rule.
+      if (roomRef.current) {
+        setError('Leave your current room before creating a new one.')
+        setErrorCode('already_in_room')
+        return
+      }
+
       const activeClient = client ?? (await getSupabaseClient())
       if (!activeClient) {
         setError('Online multiplayer is not configured on this deployment.')
@@ -277,6 +341,7 @@ export function useOnlineRoom(): OnlineRoomController {
           return
         }
         const state = await createOnlineRoom(activeClient, displayName, boardSize)
+        setNotice(null)
         applyState(state)
       } catch (thrown) {
         fail(thrown)
@@ -300,6 +365,12 @@ export function useOnlineRoom(): OnlineRoomController {
       if (!isValidRoomCode(normalized)) {
         setError('That room code is not valid. Codes are eight characters, for example ABCD-1234.')
         setErrorCode('invalid_code')
+        return
+      }
+      // Joining another room while seated would leave the first one behind.
+      if (roomRef.current && roomRef.current.room.joinCode !== normalized) {
+        setError('You are already in a room. Leave it before joining another one.')
+        setErrorCode('already_in_room')
         return
       }
 
@@ -350,6 +421,7 @@ export function useOnlineRoom(): OnlineRoomController {
     setRoom(null)
     setBasePhase('lobby')
     setOpponentPresent(null)
+    setNotice(null)
     clearError()
     if (!activeClient || !code) return
     try {
@@ -429,6 +501,7 @@ export function useOnlineRoom(): OnlineRoomController {
     setRoom(null)
     setBasePhase(configured ? 'lobby' : 'unconfigured')
     setOpponentPresent(null)
+    setNotice(null)
     clearError()
   }, [clearError, configured])
 
@@ -467,6 +540,10 @@ export function useOnlineRoom(): OnlineRoomController {
     phase,
     room,
     mySymbol: mySymbol,
+    role,
+    permissions,
+    hostLeft,
+    notice,
     userId,
     connection,
     error,

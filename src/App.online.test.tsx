@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createClient } from '@supabase/supabase-js'
 import App from './App'
@@ -262,6 +262,95 @@ describe('online match controls', () => {
     await waitFor(() => {
       const status = screen.getAllByText(/live/i)
       expect(status.length).toBeGreaterThan(0)
+    })
+  })
+})
+
+/** A room created by someone else - this browser is the guest (O). */
+function guestPayload(status: 'active' | 'finished' | 'closed' = 'active') {
+  const base = makeRoomPayload({ status })
+  const finished = status === 'finished'
+  return {
+    ...base,
+    room: {
+      ...base.room,
+      result: finished ? ('X' as const) : null,
+      winnerSymbol: finished ? ('X' as const) : null,
+    },
+    players: [
+      { ...base.players[0], userId: 'host-user', symbol: 'X' as const, isOwner: true },
+      { ...base.players[0], userId: 'anonymous-user', symbol: 'O' as const, isOwner: false },
+    ],
+    mySymbol: 'O' as const,
+  }
+}
+
+describe('room permissions', () => {
+  it('shows the host the code, invite and share controls in the waiting room', async () => {
+    const user = userEvent.setup()
+    supabase.onRpc('create_online_room', () => makeRoomPayload())
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /online/i }))
+    await user.click(screen.getByRole('button', { name: /create private room/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/waiting for your opponent/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /copy invite link/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /create private room/i })).not.toBeInTheDocument()
+  })
+
+  it('offers the invited visitor a guest join and nothing else', async () => {
+    window.history.replaceState({}, '', '/?room=ABCD1234')
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/you were invited to a room/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/you are joining as guest/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /join this room/i })).toBeInTheDocument()
+
+    expect(screen.queryByRole('button', { name: /create private room/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy code/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy invite link/i })).not.toBeInTheDocument()
+  })
+
+  it('only lets the guest accept a rematch the host requested', async () => {
+    const user = userEvent.setup()
+    supabase.onRpc('join_online_room', () => guestPayload('finished'))
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /online/i }))
+    await user.type(screen.getByLabelText(/join with a room code/i), 'ABCD1234')
+    await user.click(screen.getByRole('button', { name: /^join$/i }))
+
+    const accept = await screen.findByRole('button', { name: /accept rematch/i })
+    expect(accept).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /request rematch/i })).not.toBeInTheDocument()
+  })
+
+  it('tells the guest the host left and takes the room away', async () => {
+    const user = userEvent.setup()
+    supabase.onRpc('join_online_room', () => guestPayload('active'))
+    supabase.onRpc('get_online_room_state', () => guestPayload('closed'))
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /online/i }))
+    await user.type(screen.getByLabelText(/join with a room code/i), 'ABCD1234')
+    await user.click(screen.getByRole('button', { name: /^join$/i }))
+
+    await waitFor(() => {
+      expect(supabase.channels[0]).toBeDefined()
+    })
+
+    await act(async () => {
+      supabase.channels[0].emitChange({})
+    })
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/host left the room/i).length).toBeGreaterThan(0)
     })
   })
 })

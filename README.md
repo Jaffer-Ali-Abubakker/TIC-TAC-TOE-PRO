@@ -75,6 +75,13 @@ not the browser - decides whether a move is legal.
 
 - Create a private room, join one with an eight character code, or open an
   invite link.
+- **Roles and permissions:** the creator is the **host** (X) and owns the room,
+  its code and the invite link; the joiner is the **guest** (O) and can only
+  play and leave (plus accept a rematch the host requested). The host leaving
+  closes the room and invalidates the link; the guest is returned to the lobby
+  with a "Host left" message and is never promoted. A guest leaving frees the
+  seat so the host can invite someone else with the same code. A third visitor
+  of a full room is told "Room is full".
 - Choose the board size first: 3x3 up to 10x10 (100 cells), from presets or with
   custom rows and columns. The room stores the geometry, so both players always
   play the same board and the same win length (3 on 3x3, 4 up to 7x7, 5 above).
@@ -222,6 +229,7 @@ and function the online mode needs:
 | `0001_online_multiplayer.sql` | The whole backend: tables, RPCs, RLS, grants, realtime |
 | `0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key |
 | `0003_online_board_size.sql` | `rows` / `cols` / `win_length` on rooms, geometry-aware win detection |
+| `0004_online_room_permissions.sql` | `closed` room status, role-aware leave (host closes, guest frees the seat), closed rooms refuse joins |
 
 **Option A - Supabase CLI (recommended)**
 
@@ -249,8 +257,8 @@ supabase db push
 1. Open *SQL Editor -> New query* in the Supabase dashboard.
 2. Paste the contents of `supabase/migrations/0001_online_multiplayer.sql`.
 3. Click *Run*.
-4. Repeat for `0002_online_moves_user_index.sql` and
-   `0003_online_board_size.sql`, in that order.
+4. Repeat for `0002_online_moves_user_index.sql`,
+   `0003_online_board_size.sql` and `0004_online_room_permissions.sql`, in that order.
 
 **Option C - psql**
 
@@ -258,6 +266,7 @@ supabase db push
 psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_online_multiplayer.sql
 psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0002_online_moves_user_index.sql
 psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0003_online_board_size.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0004_online_room_permissions.sql
 ```
 
 Every migration is idempotent: re-running it is safe.
@@ -377,6 +386,61 @@ You should see `PASS:` lines and a final
 8. A 2.5 second poll runs as a safety net, so the game still synchronises if
    realtime is unavailable or misconfigured.
 
+### Room permissions (TIC-006)
+
+A room has exactly **two roles**, and the role is decided by the database, never
+by the browser:
+
+| Role | Who | Can |
+| --- | --- | --- |
+| **Host** | the creator - seated as X, `is_owner = true` | Create the room, copy the code, copy the invite link, share it, play, leave (= close the room), start a rematch, accept a rematch |
+| **Guest** | the joiner - seated as O through the code or the `?room=` link | **Play and leave only**, and accept a rematch the host asked for |
+| **Spectator** | a third visitor of a full link (no seat) | Leave |
+| **Lobby** | not in a room | Create a room, join a room, choose the board size |
+
+The guest can **not** create a room while inside one, copy the code or the
+invite link, share it, change the board size, delete the room or kick anyone.
+Those controls are hidden in the UI, `useOnlineRoom.createRoom` refuses the
+call when a room is already open, and the database refuses the write paths
+anyway (all table write privileges are revoked - every mutation goes through a
+`SECURITY DEFINER` function).
+
+How leaving works:
+
+- **The host leaves** - the room becomes `closed` immediately. The invite link
+  is dead (re-opening it says "This room is closed or the host left"), the guest
+  sees *"Host left the room"* for three seconds and is returned to the lobby.
+  The guest is **never** promoted to host.
+- **The guest leaves** - the guest seat is freed, the board is reset and the
+  room goes back to `waiting`. The host stays in the waiting room with the same
+  code and can invite somebody else.
+- **Both leave** - the room is closed and the code can never be used again.
+- **Refresh** - the role is re-derived from `online_room_players.is_owner`, so a
+  guest who reloads the page is still a guest.
+- **Third visitor** - a full room answers `online:room_full`
+  ("That room is already full - two players are seated").
+
+Room status is one of `waiting`, `active`, `finished`, `expired`, `closed`.
+
+### Playing with a friend
+
+1. The **host** switches to *Online*, picks a board size in the lobby (3×3 up to
+   10×10, with the live `6×6 • 4 to win` badge) and presses *Create private
+   room*.
+2. The host copies the invite link (or the code) from the waiting room and sends
+   it over any chat app.
+3. The **guest** opens the link and sees the guest banner - *"You are joining as
+   Guest (O) - you can only play and leave"* - then presses *Join this room*.
+   Nothing is taken automatically, so link previewers cannot steal the seat.
+4. They play. Only the player whose turn it is can move, and the database
+   decides whether the move is legal.
+5. If the **host leaves**, the room closes and the link stops working; the guest
+   is told *"Host left the room"* and returns to the lobby.
+6. If the **guest leaves**, the host stays in the waiting room with the same
+   code and can invite a new opponent.
+7. A third person opening a full link is told *"That room is already full - two
+   players are seated"*.
+
 ## Database schema
 
 ### `public.online_rooms`
@@ -385,7 +449,7 @@ You should see `PASS:` lines and a final
 | ---------------------- | ------------- | -------------------------------------------- |
 | `id`                   | `uuid`        | Primary key                                  |
 | `join_code`            | `text`        | Unique, 8 characters of a 32 character alphabet (2^40) |
-| `status`               | `text`        | `waiting` / `active` / `finished` / `expired` |
+| `status`               | `text`        | `waiting` / `active` / `finished` / `expired` / `closed` |
 | `rows`                 | `integer`     | 3-10, chosen by the creator, never changed   |
 | `cols`                 | `integer`     | 3-10, `rows * cols` at most 100              |
 | `win_length`           | `integer`     | 3, 4 or 5, derived from the shape            |
@@ -519,7 +583,7 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 295 tests in 14 files:
+The suite has 314 tests in 15 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
@@ -540,19 +604,22 @@ The suite has 295 tests in 14 files:
   arpeggio with its convolver, the draw tremolo, every sound name, the mute flag,
   the hover throttle and the degraded paths (no API, no filter, throwing node).
 - **Online module** (`src/online/*.test.ts`) - room codes, invite links,
-  configuration validation, the API layer, the error mapping and the room
-  controller (realtime subscription, polling fallback, reconnect, move
-  idempotency).
+  configuration validation, the API layer, the error mapping, the host/guest
+  permission matrix and the room controller (realtime subscription, polling
+  fallback, reconnect, move idempotency, role derivation, host-left return).
 - **Application** (`src/App.test.tsx`, `src/App.online.test.tsx`) - the local
   modes, the online lobby, room creation on a chosen board size, joining a room
-  of any size, invite links, rematch, connection status and the
+  of any size, invite links, rematch, connection status, the guest invite card,
+  the host-only copy controls and the host-left banner, and the
   missing-configuration state.
 - **Database** (`supabase/tests/online_multiplayer.test.ts`) - every migration
   executed in order against a real PostgreSQL engine (PGlite) with a small
   Supabase shim. It proves that unauthenticated callers are rejected, that
   seats are allocated correctly, that a third player is turned away, that
   direct table writes fail, that illegal moves are rejected, that a retried
-  move is applied only once, that a rematch needs both players, and that a room
+  move is applied only once, that a rematch needs both players, that the host
+  leaving closes the room (and the code can never be joined again) while the
+  guest leaving frees the seat and returns the room to `waiting`, and that a room
   keeps the board size it was created with (four in a row on a 6×6, five on a
   10×10, 3×3 when the size is omitted).
 - **SQL script** (`supabase/tests/online_multiplayer_sql.test.ts`) - executes
@@ -770,7 +837,8 @@ actions row is always the last thing inside the viewport.
 │   ├── migrations/
 │   │   ├── 0001_online_multiplayer.sql   # Schema, RLS and the game functions
 │   │   ├── 0002_online_moves_user_index.sql # Index for the move log FK
-│   │   └── 0003_online_board_size.sql    # Room board size + geometry-aware wins
+│   │   ├── 0003_online_board_size.sql    # Room board size + geometry-aware wins
+│   │   └── 0004_online_room_permissions.sql # Host/guest leave rules + closed rooms
 │   └── tests/
 │       ├── harness.ts             # Local PostgreSQL harness (PGlite + shim)
 │       ├── online_multiplayer.test.ts    # Database security tests
@@ -798,7 +866,7 @@ actions row is always the last thing inside the viewport.
     │   ├── Toggle.tsx             # Accessible switch
     │   ├── TurnIndicator.tsx      # Whose turn it is (live region)
     │   └── online/
-    │       ├── OnlineActions.tsx      # Rematch and leave controls
+    │       ├── OnlineActions.tsx      # Rematch and leave (guest accepts only)
     │       ├── OnlineLobby.tsx        # Create / join / invitation
     │       ├── OnlinePlayersBar.tsx   # Both players and the connection state
     │       ├── OnlineSetupNotice.tsx  # "Not configured" panel
@@ -814,6 +882,7 @@ actions row is always the last thing inside the viewport.
     │   ├── config.ts              # Environment validation
     │   ├── database.types.ts      # GENERATED from the live schema
     │   ├── onlineApi.ts           # Typed wrappers around the RPC functions
+    │   ├── permissions.ts         # Host / guest / lobby permission matrix
     │   ├── roomCode.ts            # Room codes and invite links
     │   ├── supabase.ts            # Lazily loaded Supabase client
     │   ├── useOnlineRoom.ts       # Room controller (realtime + polling)
@@ -970,6 +1039,13 @@ collapse to a single frame), while the game and the sounds keep working.
   unavailable. The game still works, just with a slightly higher latency.
 - Rooms expire after two hours. There is no automatic deletion - run
   `online_expire_rooms()` (see above).
+- **Room permissions** are enforced in three places: the UI (`getPermissions`
+  hides host-only controls from the guest), the controller (`useOnlineRoom`
+  refuses to create a second room while one is open) and the database (every
+  table write privilege is revoked; `leave_online_room` decides the outcome from
+  the `is_owner` seat and a closed room refuses every join). There is no kick,
+  transfer or separate delete-room RPC: the host "deletes" a room by leaving,
+  which closes it.
 - Anonymous sign-in is enabled per Supabase project. If it is disabled the
   online mode cannot create a guest session.
 - For a public deployment, add a CAPTCHA (for example Cloudflare Turnstile)

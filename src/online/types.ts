@@ -17,7 +17,7 @@ import type { Database } from './database.types'
 type RoomRow = Database['public']['Tables']['online_rooms']['Row']
 type PlayerRow = Database['public']['Tables']['online_room_players']['Row']
 
-export type OnlineRoomStatus = 'waiting' | 'active' | 'finished' | 'expired'
+export type OnlineRoomStatus = 'waiting' | 'active' | 'finished' | 'expired' | 'closed'
 
 export type OnlineResult = 'X' | 'O' | 'draw'
 
@@ -87,6 +87,7 @@ export type OnlineErrorCode =
   | 'room_not_found'
   | 'room_expired'
   | 'room_finished'
+  | 'room_closed'
   | 'room_full'
   | 'already_in_room'
   | 'not_a_member'

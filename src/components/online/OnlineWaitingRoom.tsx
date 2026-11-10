@@ -2,12 +2,17 @@ import { useState } from 'react'
 import { Check, Copy, Link2, LogOut, Share2, UserPlus } from 'lucide-react'
 import type { BoardSize } from '../../game/types'
 import { formatRoomCode } from '../../online/roomCode'
+import type { RoomRole } from '../../online/permissions'
 import { copyToClipboard, shareOrCopy, type CopyOutcome } from '../../utils/clipboard'
 
 export interface OnlineWaitingRoomProps {
   roomCode: string
   inviteLink: string | null
   boardSize: BoardSize
+  /** Only the host owns the code and the invite: the guest may only leave. */
+  role: RoomRole
+  /** A transient message such as "Opponent left". */
+  notice?: string | null
   busy: boolean
   onLeave: () => void
 }
@@ -27,22 +32,25 @@ export function OnlineWaitingRoom({
   roomCode,
   inviteLink,
   boardSize,
+  role,
+  notice,
   busy,
   onLeave,
 }: OnlineWaitingRoomProps) {
-  const [notice, setNotice] = useState<Notice>(null)
+  const [localNotice, setLocalNotice] = useState<Notice>(null)
   const formatted = formatRoomCode(roomCode)
   const { rows, cols, winLength } = boardSize
+  const isHost = role === 'host'
 
   const handleCopyCode = async () => {
     const outcome = await copyToClipboard(roomCode)
-    setNotice(noticeFor(outcome, 'Room code copied.'))
+    setLocalNotice(noticeFor(outcome, 'Room code copied.'))
   }
 
   const handleCopyLink = async () => {
     if (!inviteLink) return
     const outcome = await copyToClipboard(inviteLink)
-    setNotice(noticeFor(outcome, 'Invite link copied.'))
+    setLocalNotice(noticeFor(outcome, 'Invite link copied.'))
   }
 
   const handleShare = async () => {
@@ -52,7 +60,7 @@ export function OnlineWaitingRoom({
       `Join my Tic-Tac-Toe room ${formatted} (${rows}×${cols})`,
       inviteLink,
     )
-    setNotice(noticeFor(outcome, 'Invite shared.'))
+    setLocalNotice(noticeFor(outcome, 'Invite shared.'))
   }
 
   return (
@@ -62,11 +70,12 @@ export function OnlineWaitingRoom({
           <UserPlus className="size-5 text-lime" aria-hidden="true" />
         </span>
         <h2 className="mt-4 text-lg font-bold tracking-tight text-text">
-          Waiting for your opponent
+          {isHost ? 'Waiting for your opponent' : 'Waiting for the host'}
         </h2>
         <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-muted">
-          Share the room code or the invite link. The match starts as soon as a second player
-          joins - you will play a {rows}×{cols} board, {winLength} in a row to win.
+          {isHost
+            ? `Share the room code or the invite link. The match starts as soon as a second player joins - you will play a ${rows}×${cols} board, ${winLength} in a row to win.`
+            : `You joined room ${formatted} as guest (O) - you can play and leave only. The host starts the match. You will play a ${rows}×${cols} board, ${winLength} in a row to win.`}
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -88,32 +97,41 @@ export function OnlineWaitingRoom({
           ))}
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button type="button" onClick={handleCopyLink} disabled={!inviteLink} className="btn btn-primary">
-            <Link2 className="size-4" aria-hidden="true" />
-            Copy invite link
-          </button>
-          <button type="button" onClick={handleCopyCode} className="btn btn-secondary">
-            <Copy className="size-4" aria-hidden="true" />
-            Copy code
-          </button>
-          <button type="button" onClick={handleShare} disabled={!inviteLink} className="btn btn-ghost">
-            <Share2 className="size-4" aria-hidden="true" />
-            Share
-          </button>
-        </div>
+        {isHost ? (
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={handleCopyLink} disabled={!inviteLink} className="btn btn-primary">
+              <Link2 className="size-4" aria-hidden="true" />
+              Copy invite link
+            </button>
+            <button type="button" onClick={handleCopyCode} className="btn btn-secondary">
+              <Copy className="size-4" aria-hidden="true" />
+              Copy code
+            </button>
+            <button type="button" onClick={handleShare} disabled={!inviteLink} className="btn btn-ghost">
+              <Share2 className="size-4" aria-hidden="true" />
+              Share
+            </button>
+          </div>
+        ) : null}
 
-        {notice ? (
+        {localNotice ? (
           <p
             role="status"
             className={`mt-4 inline-flex items-center gap-2 rounded-sm px-3 py-2 text-[13px] ${
-              notice.tone === 'ok'
+              localNotice.tone === 'ok'
                 ? 'bg-emerald/10 text-emerald border border-emerald'
                 : 'bg-rose/10 text-rose border border-rose'
             }`}
           >
-            {notice.tone === 'ok' ? <Check className="size-4" aria-hidden="true" /> : null}
-            {notice.message}
+            {localNotice.tone === 'ok' ? <Check className="size-4" aria-hidden="true" /> : null}
+            {localNotice.message}
+          </p>
+        ) : notice ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-lg border-2 border-lime bg-lime/10 px-3 py-2 text-sm text-lime"
+          >
+            {notice}
           </p>
         ) : null}
 

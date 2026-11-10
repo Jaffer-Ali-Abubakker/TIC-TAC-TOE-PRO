@@ -1,4 +1,5 @@
 import { Check, LogOut, RefreshCw, Swords } from 'lucide-react'
+import type { RoomRole } from '../../online/permissions'
 
 export interface OnlineActionsProps {
   busy: boolean
@@ -6,6 +7,7 @@ export interface OnlineActionsProps {
   canRematch: boolean
   iRequestedRematch: boolean
   opponentRequestedRematch: boolean
+  role: RoomRole
   onRequestRematch: () => void
   onLeave: () => void
 }
@@ -16,9 +18,11 @@ export function OnlineActions({
   canRematch,
   iRequestedRematch,
   opponentRequestedRematch,
+  role,
   onRequestRematch,
   onLeave,
 }: OnlineActionsProps) {
+  const isGuest = role === 'guest'
   const opponentIsWaiting = opponentRequestedRematch && !iRequestedRematch
 
   return (
@@ -44,11 +48,11 @@ export function OnlineActions({
           <button
             type="button"
             onClick={onRequestRematch}
-            disabled={busy || iRequestedRematch}
+            disabled={busy || iRequestedRematch || (isGuest && !opponentIsWaiting)}
             className="btn btn-primary mt-3 w-full"
           >
             <RefreshCw className={`size-4 ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
-            {opponentIsWaiting ? 'Accept rematch' : 'Request rematch'}
+            {isGuest ? 'Accept rematch' : 'Request rematch'}
           </button>
         </div>
       ) : null}
@@ -64,7 +68,9 @@ export function OnlineActions({
       </button>
 
       <p className="helper-text mt-3">
-        Leaving ends the match for both players. No forfeit win is awarded.
+        {isGuest
+          ? 'Leaving frees the seat so the host can invite someone else.'
+          : 'Leaving closes the room and invalidates the invite link. No forfeit win is awarded.'}
       </p>
     </section>
   )

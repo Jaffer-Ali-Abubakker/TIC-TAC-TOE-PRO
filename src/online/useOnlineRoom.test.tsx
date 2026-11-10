@@ -293,3 +293,91 @@ describe('useOnlineRoom', () => {
     unmount()
   })
 })
+
+/** The guest snapshot: the creator owns X, the fake session holds O. */
+function guestPayload(status: 'active' | 'closed' = 'active', version = 2) {
+  const base = makeRoomPayload({ status, version })
+  return {
+    ...base,
+    players: [
+      { ...base.players[0], userId: 'host-user', symbol: 'X' as const, isOwner: true },
+      { ...base.players[0], userId: 'anonymous-user', symbol: 'O' as const, isOwner: false },
+    ],
+    mySymbol: 'O' as const,
+  }
+}
+
+describe('room roles and permissions', () => {
+  it('derives the host role from the owner seat', async () => {
+    supabase.onRpc('create_online_room', () => makeRoomPayload())
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.createRoom({ rows: 3, cols: 3, winLength: 3 })
+    })
+
+    expect(result.current.role).toBe('host')
+    expect(result.current.permissions.canCopyCode).toBe(true)
+    expect(result.current.permissions.canCreateRoom).toBe(false)
+  })
+
+  it('derives the guest role from the database, not from local state', async () => {
+    supabase.onRpc('join_online_room', () => guestPayload())
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.joinRoom('ABCD1234')
+    })
+
+    expect(result.current.role).toBe('guest')
+    expect(result.current.mySymbol).toBe('O')
+    expect(result.current.permissions.canCopyCode).toBe(false)
+    expect(result.current.permissions.canCopyLink).toBe(false)
+    expect(result.current.permissions.canShare).toBe(false)
+    expect(result.current.permissions.canPlay).toBe(true)
+    expect(result.current.permissions.canLeave).toBe(true)
+  })
+
+  it('refuses a second room while one is open', async () => {
+    supabase.onRpc('create_online_room', () => makeRoomPayload())
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.createRoom({ rows: 3, cols: 3, winLength: 3 })
+    })
+    await act(async () => {
+      await result.current.createRoom({ rows: 3, cols: 3, winLength: 3 })
+    })
+
+    expect(result.current.errorCode).toBe('already_in_room')
+    expect(supabase.rpcCalls.filter((call) => call.name === 'create_online_room')).toHaveLength(1)
+  })
+
+  it('sends the guest back to the lobby when the host closes the room', async () => {
+    supabase.onRpc('join_online_room', () => guestPayload())
+    supabase.onRpc('get_online_room_state', () => guestPayload('closed', 3))
+    const { result } = renderHook(() => useOnlineRoom())
+
+    await act(async () => {
+      await result.current.joinRoom('ABCD1234')
+    })
+
+    await act(async () => {
+      supabase.channels[0].emitChange({})
+    })
+
+    await waitFor(() => {
+      expect(result.current.hostLeft).toBe(true)
+    })
+    expect(result.current.errorCode).toBe('room_closed')
+    expect(result.current.role).toBe('guest')
+
+    await waitFor(
+      () => {
+        expect(result.current.room).toBeNull()
+      },
+      { timeout: 5000 },
+    )
+    expect(result.current.role).toBeNull()
+  })
+})
