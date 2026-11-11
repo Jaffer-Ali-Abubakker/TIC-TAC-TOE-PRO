@@ -310,3 +310,109 @@ describe('selectors', () => {
     expect(getPlayerLabel({ ...state, mode: 'pvp' }, 'O')).toBe('Player 2')
   })
 })
+
+describe('setBoardSize', () => {
+  it('starts a fresh round on the new board and keeps the scores', () => {
+    const played = reduce(
+      createInitialGameState(),
+      { type: 'playMove', index: 0, player: 'X' },
+      { type: 'playMove', index: 1, player: 'O' },
+      { type: 'playMove', index: 2, player: 'X' },
+    )
+    const roundId = played.roundId
+
+    const resized = reduce(played, { type: 'setBoardSize', rows: 4, cols: 4 })
+
+    expect(resized.board).toHaveLength(16)
+    expect(resized.board.every((cell) => cell === null)).toBe(true)
+    expect(resized.boardSize).toEqual({ rows: 4, cols: 4, winLength: 4 })
+    expect(resized.status).toBe('playing')
+    expect(resized.movesPlayed).toBe(0)
+    expect(resized.currentPlayer).toBe('X')
+    expect(resized.roundId).toBe(roundId + 1)
+    expect(resized.stats).toEqual(played.stats)
+    expect(resized.history).toEqual(played.history)
+  })
+
+  it('rejects sizes outside the limits instead of changing anything', () => {
+    const state = createInitialGameState()
+    expect(reduce(state, { type: 'setBoardSize', rows: 2, cols: 3 })).toBe(state)
+    expect(reduce(state, { type: 'setBoardSize', rows: 11, cols: 11 })).toBe(state)
+  })
+
+  it('ignores a request for the size that is already set', () => {
+    const state = createInitialGameState()
+    expect(reduce(state, { type: 'setBoardSize', rows: 3, cols: 3 })).toBe(state)
+  })
+
+  it('plays and scores a round on a 4x4 board', () => {
+    const state = reduce(
+      createInitialGameState(),
+      { type: 'setBoardSize', rows: 4, cols: 4 },
+      { type: 'playMove', index: 0, player: 'X' },
+      { type: 'playMove', index: 8, player: 'O' },
+      { type: 'playMove', index: 1, player: 'X' },
+      { type: 'playMove', index: 9, player: 'O' },
+      { type: 'playMove', index: 2, player: 'X' },
+      { type: 'playMove', index: 10, player: 'O' },
+      { type: 'playMove', index: 3, player: 'X' },
+    )
+
+    expect(state.status).toBe('won')
+    expect(state.winner).toBe('X')
+    expect(state.winningCombination).toEqual([0, 1, 2, 3])
+    expect(state.stats.pvc.playerWins).toBe(1)
+    expect(state.stats.pvc.rounds).toBe(1)
+    expect(state.history[0]).toMatchObject({ rows: 4, cols: 4, result: 'X' })
+  })
+
+  it('does not reuse the 3x3 win length on a big board', () => {
+    const state = reduce(
+      createInitialGameState(),
+      { type: 'setBoardSize', rows: 5, cols: 5 },
+      { type: 'playMove', index: 0, player: 'X' },
+      { type: 'playMove', index: 10, player: 'O' },
+      { type: 'playMove', index: 1, player: 'X' },
+      { type: 'playMove', index: 11, player: 'O' },
+      { type: 'playMove', index: 2, player: 'X' },
+    )
+
+    expect(state.status).toBe('playing')
+    expect(state.winner).toBeNull()
+  })
+
+  it('keeps the chosen size when the online mode is entered', () => {
+    const online = reduce(
+      reduce(createInitialGameState(), { type: 'setBoardSize', rows: 6, cols: 6 }),
+      { type: 'setMode', mode: 'online' },
+    )
+
+    // The lobby needs the picked size to offer it to the room creator.
+    expect(online.boardSize).toEqual({ rows: 6, cols: 6, winLength: 4 })
+    expect(online.board).toHaveLength(36)
+  })
+
+  it('adopts the room geometry from the authoritative snapshot', () => {
+    const online = reduce(createInitialGameState(), {
+      type: 'applyOnlineState',
+      snapshot: {
+        boardSize: { rows: 10, cols: 10, winLength: 5 },
+        board: Array.from({ length: 100 }, (_, index) => (index === 99 ? 'X' : null)),
+        currentTurn: 'O',
+        status: 'playing',
+        winnerSymbol: null,
+        winningCombination: null,
+        roundNumber: 1,
+        movesPlayed: 1,
+        lastMoveIndex: 99,
+        version: 2,
+        result: null,
+      },
+      mySymbol: 'X',
+    })
+
+    expect(online.boardSize).toEqual({ rows: 10, cols: 10, winLength: 5 })
+    expect(online.board).toHaveLength(100)
+    expect(online.board[99]).toBe('X')
+  })
+})

@@ -2,7 +2,7 @@
  * Types for the online multiplayer mode.
  *
  * These mirror the JSON payload produced by the PostgreSQL functions in
- * `supabase/migrations/0001_online_multiplayer.sql`.
+ * `supabase/migrations/`.
  *
  * The row shapes are derived from `database.types.ts`, which is generated
  * straight from the live schema with:
@@ -17,7 +17,7 @@ import type { Database } from './database.types'
 type RoomRow = Database['public']['Tables']['online_rooms']['Row']
 type PlayerRow = Database['public']['Tables']['online_room_players']['Row']
 
-export type OnlineRoomStatus = 'waiting' | 'active' | 'finished' | 'expired'
+export type OnlineRoomStatus = 'waiting' | 'active' | 'finished' | 'expired' | 'closed'
 
 export type OnlineResult = 'X' | 'O' | 'draw'
 
@@ -26,6 +26,10 @@ export interface OnlineRoom {
   id: RoomRow['id']
   joinCode: RoomRow['join_code']
   status: OnlineRoomStatus
+  /** Board geometry, chosen by the creator and fixed for the whole room. */
+  rows: RoomRow['rows']
+  cols: RoomRow['cols']
+  winLength: RoomRow['win_length']
   board: Cell[]
   currentTurn: Player
   winnerSymbol: Player | null
@@ -83,6 +87,7 @@ export type OnlineErrorCode =
   | 'room_not_found'
   | 'room_expired'
   | 'room_finished'
+  | 'room_closed'
   | 'room_full'
   | 'already_in_room'
   | 'not_a_member'
@@ -93,6 +98,7 @@ export type OnlineErrorCode =
   | 'stale_version'
   | 'cell_taken'
   | 'invalid_cell'
+  | 'invalid_board_size'
   | 'invalid_move_id'
   | 'code_generation_failed'
   | 'network'

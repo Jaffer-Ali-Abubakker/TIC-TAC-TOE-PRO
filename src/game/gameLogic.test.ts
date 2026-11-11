@@ -5,15 +5,18 @@ import {
   WINNING_COMBINATIONS,
   canPlayAt,
   createInitialBoard,
+  generateWinLines,
   getAvailableMoves,
   getGameStatus,
+  getWinLength,
   getWinner,
   getWinningCombination,
   isBoardFull,
   isValidIndex,
   makeMove,
+  normaliseBoardSize,
 } from './gameLogic'
-import type { Board, Cell, Player } from './types'
+import type { Board, BoardSize, Cell, Player } from './types'
 
 function boardWith(marks: Record<number, Player>): Board {
   const board = createInitialBoard().slice() as Cell[]
@@ -235,5 +238,103 @@ describe('game flow', () => {
     ])
     expect(getWinner(board)).toBeNull()
     expect(getGameStatus(board)).toBe('draw')
+  })
+})
+
+describe('dynamic board sizes', () => {
+  const fourByFour = normaliseBoardSize(4, 4) as BoardSize
+  const tenByTen = normaliseBoardSize(10, 10) as BoardSize
+
+  function sizedBoard(size: BoardSize, marks: Record<number, Player> = {}): Board {
+    const board = createInitialBoard(size).slice() as Cell[]
+    for (const [index, player] of Object.entries(marks)) board[Number(index)] = player
+    return board
+  }
+
+  it('derives the win length from the grid', () => {
+    expect(getWinLength(3, 3)).toBe(3)
+    expect(getWinLength(4, 4)).toBe(4)
+    expect(getWinLength(7, 7)).toBe(4)
+    expect(getWinLength(8, 8)).toBe(5)
+    expect(getWinLength(10, 10)).toBe(5)
+    expect(getWinLength(3, 10)).toBe(5)
+  })
+
+  it('accepts only 3-10 dimensions inside the 100 cell budget', () => {
+    expect(normaliseBoardSize(3, 3)).toEqual({ rows: 3, cols: 3, winLength: 3 })
+    expect(normaliseBoardSize(9, 10)).toEqual({ rows: 9, cols: 10, winLength: 5 })
+    expect(normaliseBoardSize(2, 3)).toBeNull()
+    expect(normaliseBoardSize(3, 11)).toBeNull()
+    expect(normaliseBoardSize(10.5, 4)).toBeNull()
+    expect(normaliseBoardSize(Number.NaN, 4)).toBeNull()
+  })
+
+  it('generates the classic eight lines for 3x3', () => {
+    expect(generateWinLines(3, 3, 3)).toHaveLength(8)
+    expect(generateWinLines(3, 3, 3)).toEqual(WINNING_COMBINATIONS.map((line) => [...line]))
+  })
+
+  it('generates rows, columns and both diagonals for 4x4', () => {
+    const lines = generateWinLines(4, 4, 4)
+    expect(lines).toHaveLength(10)
+    expect(lines).toContainEqual([0, 1, 2, 3])
+    expect(lines).toContainEqual([0, 4, 8, 12])
+    expect(lines).toContainEqual([3, 6, 9, 12])
+  })
+
+  it('creates an empty board of the requested shape', () => {
+    expect(createInitialBoard(fourByFour)).toHaveLength(16)
+    expect(createInitialBoard(tenByTen)).toHaveLength(100)
+    expect(createInitialBoard(tenByTen).every((cell) => cell === null)).toBe(true)
+  })
+
+  it('detects a row win on a 4x4 board', () => {
+    const board = sizedBoard(fourByFour, { 4: 'X', 5: 'X', 6: 'X', 7: 'X' })
+    expect(getWinner(board, fourByFour)).toBe('X')
+    expect(getWinningCombination(board, fourByFour)).toEqual([4, 5, 6, 7])
+    expect(getGameStatus(board, fourByFour)).toBe('won')
+  })
+
+  it('needs five in a line on a 10x10 board', () => {
+    const four = sizedBoard(tenByTen, { 40: 'O', 41: 'O', 42: 'O', 43: 'O' })
+    expect(getWinner(four, tenByTen)).toBeNull()
+
+    const five = sizedBoard(tenByTen, { 40: 'O', 41: 'O', 42: 'O', 43: 'O', 44: 'O' })
+    expect(getWinner(five, tenByTen)).toBe('O')
+  })
+
+  it('detects both diagonals on a 10x10 board', () => {
+    const falling = sizedBoard(tenByTen, { 0: 'X', 11: 'X', 22: 'X', 33: 'X', 44: 'X' })
+    expect(getWinner(falling, tenByTen)).toBe('X')
+
+    const rising = sizedBoard(tenByTen, { 9: 'O', 18: 'O', 27: 'O', 36: 'O', 45: 'O' })
+    expect(getWinner(rising, tenByTen)).toBe('O')
+  })
+
+  it('detects a column win on a tall board', () => {
+    const board = sizedBoard(tenByTen, { 5: 'X', 15: 'X', 25: 'X', 35: 'X', 45: 'X' })
+    expect(getWinner(board, tenByTen)).toBe('X')
+  })
+
+  it('reports a draw on a full 4x4 board with no line', () => {
+    const board = sizedBoard(fourByFour, {
+      0: 'X', 1: 'O', 2: 'X', 3: 'O',
+      4: 'X', 5: 'O', 6: 'X', 7: 'O',
+      8: 'O', 9: 'X', 10: 'O', 11: 'X',
+      12: 'O', 13: 'X', 14: 'O', 15: 'X',
+    })
+    expect(getWinner(board, fourByFour)).toBeNull()
+    expect(getGameStatus(board, fourByFour)).toBe('draw')
+  })
+
+  it('rejects moves outside the board of a 4x4 grid', () => {
+    const board = createInitialBoard(fourByFour)
+    expect(() => makeMove(board, 16, 'X', fourByFour)).toThrow(InvalidMoveError)
+    expect(() => makeMove(board, 15, 'X', fourByFour)).not.toThrow()
+  })
+
+  it('rejects moves after a win on a big board', () => {
+    const board = sizedBoard(tenByTen, { 0: 'X', 11: 'X', 22: 'X', 33: 'X', 44: 'X' })
+    expect(() => makeMove(board, 99, 'O', tenByTen)).toThrow(InvalidMoveError)
   })
 })

@@ -1,5 +1,5 @@
 import { Circle, CloudOff, Radio, RefreshCw, Wifi } from 'lucide-react'
-import type { Player } from '../../game/types'
+import type { BoardSize, Player } from '../../game/types'
 import type { OnlineConnectionStatus, OnlinePlayer } from '../../online/types'
 
 export interface OnlinePlayersBarProps {
@@ -9,32 +9,33 @@ export interface OnlinePlayersBarProps {
   connection: OnlineConnectionStatus
   opponentPresent: boolean | null
   roundNumber: number
+  boardSize: BoardSize
 }
 
 const CONNECTION_COPY: Record<
   OnlineConnectionStatus,
   { label: string; tone: string; pill: string }
 > = {
-  offline: { label: 'Offline', tone: 'text-mist-500', pill: 'border-ink-600 bg-white' },
+  offline: { label: 'Offline', tone: 'text-muted', pill: 'border-border bg-card' },
   connecting: {
     label: 'Connecting...',
-    tone: 'text-glow-amber',
-    pill: 'border-glow-amber bg-glow-amber/10',
+    tone: 'text-amber',
+    pill: 'border-amber bg-amber/10',
   },
   connected: {
     label: 'Live',
-    tone: 'text-glow-emerald',
-    pill: 'border-glow-emerald bg-glow-emerald/10',
+    tone: 'text-emerald',
+    pill: 'border-emerald bg-emerald/10',
   },
   reconnecting: {
     label: 'Reconnecting...',
-    tone: 'text-glow-amber',
-    pill: 'border-glow-amber bg-glow-amber/10',
+    tone: 'text-amber',
+    pill: 'border-amber bg-amber/10',
   },
   failed: {
     label: 'Sync limited - retrying',
-    tone: 'text-glow-rose',
-    pill: 'border-glow-rose bg-glow-rose/10',
+    tone: 'text-rose',
+    pill: 'border-rose bg-rose/10',
   },
 }
 
@@ -51,6 +52,7 @@ export function OnlinePlayersBar({
   connection,
   opponentPresent,
   roundNumber,
+  boardSize,
 }: OnlinePlayersBarProps) {
   const connectionCopy = CONNECTION_COPY[connection]
   const ConnectionIcon =
@@ -78,8 +80,8 @@ export function OnlinePlayersBar({
               <span
                 className={`flex size-8 shrink-0 items-center justify-center rounded-sm text-sm font-bold ${
                   player.symbol === 'X'
-                    ? 'bg-glow-cyan/10 text-glow-cyan border border-glow-cyan'
-                    : 'bg-glow-violet/10 text-glow-violet border border-glow-violet'
+                    ? 'bg-lime/10 text-lime border border-lime'
+                    : 'bg-cyan/10 text-cyan border border-cyan'
                 }`}
                 aria-hidden="true"
               >
@@ -87,16 +89,16 @@ export function OnlinePlayersBar({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-ink-700">
+                  <span className="truncate text-sm font-medium text-text">
                     {displayName(player)}
                   </span>
                   {isMe ? (
-                    <span className="shrink-0 rounded bg-ink-100 px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-mist-500">
+                    <span className="shrink-0 rounded bg-border px-1.5 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-muted">
                       You
                     </span>
                   ) : null}
                 </span>
-                <span className="mt-0.5 block truncate text-[12px] text-mist-500">
+                <span className="mt-0.5 block truncate text-[12px] text-muted">
                   {isMe ? `You play ${player.symbol}` : `Opponent plays ${player.symbol}`}
                 </span>
               </span>
@@ -112,14 +114,14 @@ export function OnlinePlayersBar({
                   }
                 >
                   {opponentPresent === null ? (
-                    <Circle className="size-3.5 text-mist-600" aria-hidden="true" />
+                    <Circle className="size-3.5 text-muted" aria-hidden="true" />
                   ) : opponentPresent ? (
                     <Circle
-                      className="size-3.5 fill-glow-emerald text-glow-emerald"
+                      className="size-3.5 fill-emerald text-emerald"
                       aria-hidden="true"
                     />
                   ) : (
-                    <Circle className="size-3.5 fill-mist-600 text-mist-600" aria-hidden="true" />
+                    <Circle className="size-3.5 fill-muted text-muted" aria-hidden="true" />
                   )}
                   <span className="sr-only">
                     {opponentPresent === null
@@ -136,9 +138,12 @@ export function OnlinePlayersBar({
       </div>
 
       <p className="mt-3 flex items-center justify-between gap-2 text-[13px]">
-        <span className="text-mist-500">
+        <span className="flex items-center gap-2 text-muted">
           Round {roundNumber}
           {mySymbol ? ` - you play ${mySymbol}` : ''}
+          <span className="rounded-sm border border-border bg-card px-1.5 py-0.5 font-mono text-[11px] tracking-[0.08em] text-cyan">
+            {boardSize.rows}×{boardSize.cols}
+          </span>
         </span>
         <span
           role="status"
@@ -147,7 +152,7 @@ export function OnlinePlayersBar({
           className={`inline-flex items-center gap-2 rounded-sm border px-2 py-1 text-[13px] font-semibold ${connectionCopy.pill} ${connectionCopy.tone}`}
         >
           {connection === 'connected' ? (
-            <span className="live-dot size-2 rounded-full bg-glow-emerald" aria-hidden="true" />
+            <span className="live-dot size-2 rounded-full bg-emerald" aria-hidden="true" />
           ) : null}
           <ConnectionIcon
             className={`size-3.5 ${

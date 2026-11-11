@@ -108,12 +108,7 @@ export function Dialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center sm:p-6">
-      <div
-        className="absolute inset-0 bg-ink-950/40"
-        aria-hidden="true"
-        onClick={onClose}
-      />
+    <div className="dialog-overlay">
       <div
         ref={panelRef}
         role="dialog"
@@ -121,15 +116,15 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="panel relative z-10 max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] p-5 sm:p-6 animate-result-in"
+        className="dialog-panel animate-dialog-pop"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-bold tracking-tight text-ink-700">
+            <h2 id={titleId} className="text-lg font-bold tracking-tight text-text">
               {title}
             </h2>
             {description && !hideDescription ? (
-              <p id={descriptionId} className="mt-1 text-[13px] leading-relaxed text-mist-500">
+              <p id={descriptionId} className="mt-1 text-[13px] leading-relaxed text-muted">
                 {description}
               </p>
             ) : null}
@@ -143,7 +138,7 @@ export function Dialog({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="shrink-0 rounded-lg border border-ink-700 bg-ink-900 p-2 text-ink-700 transition-colors duration-150 hover:bg-ink-600 hover:text-white"
+            className="shrink-0 rounded-lg border border-border bg-white/40 p-2 text-text transition-colors duration-150 hover:bg-white/60"
           >
             <X className="size-4" aria-hidden="true" />
           </button>

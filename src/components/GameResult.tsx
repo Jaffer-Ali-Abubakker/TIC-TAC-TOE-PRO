@@ -18,7 +18,6 @@ interface ResultInfo {
   detail: string
   icon: typeof Crown
   accent: string
-  ring: string
   /** Drives the outcome border. */
   result: 'win' | 'draw' | 'loss' | 'neutral'
 }
@@ -41,16 +40,14 @@ export function GameResult({
           title: 'You win!',
           detail: 'You completed the line and took the round.',
           icon: Sparkles,
-          accent: 'text-glow-emerald',
-          ring: 'border-2 border-glow-emerald',
+          accent: 'text-lime',
           result: 'win',
         }
       : {
           title: 'Opponent wins',
           detail: 'Your opponent completed the line and took the round.',
           icon: Crown,
-          accent: 'text-glow-rose',
-          ring: 'border-2 border-glow-rose',
+          accent: 'text-rose',
           result: 'loss',
         }
   } else if (status === 'won' && winner !== null) {
@@ -61,16 +58,14 @@ export function GameResult({
             title: 'You win!',
             detail: 'Great play - the computer could not keep up.',
             icon: Sparkles,
-            accent: 'text-glow-emerald',
-            ring: 'border-2 border-glow-emerald',
+            accent: 'text-lime',
             result: 'win',
           }
         : {
             title: 'Computer wins',
             detail: 'The computer took this round. Try another difficulty?',
             icon: Crown,
-            accent: 'text-glow-rose',
-            ring: 'border-2 border-glow-rose',
+            accent: 'text-rose',
             result: 'loss',
           }
     } else {
@@ -80,16 +75,14 @@ export function GameResult({
               title: 'Player 1 wins',
               detail: 'Player 1 completed a line with X.',
               icon: Crown,
-              accent: 'text-glow-cyan',
-              ring: 'border-2 border-glow-cyan',
+              accent: 'text-lime',
               result: 'win',
             }
           : {
               title: 'Player 2 wins',
               detail: 'Player 2 completed a line with O.',
               icon: Handshake,
-              accent: 'text-glow-violet',
-              ring: 'border-2 border-glow-violet',
+              accent: 'text-cyan',
               result: 'win',
             }
     }
@@ -98,8 +91,7 @@ export function GameResult({
       title: 'Draw',
       detail: 'The board is full and nobody has a line.',
       icon: Medal,
-      accent: 'text-glow-amber',
-      ring: 'border-2 border-glow-amber',
+      accent: 'text-amber',
       result: 'draw',
     }
   } else if (endedWithoutWinner) {
@@ -107,8 +99,7 @@ export function GameResult({
       title: 'Match ended',
       detail: 'The match was ended without a winner. No forfeit win is awarded.',
       icon: Handshake,
-      accent: 'text-mist-500',
-      ring: 'border-2 border-ink-700',
+      accent: 'text-muted',
       result: 'neutral',
     }
   } else {
@@ -116,8 +107,7 @@ export function GameResult({
       title: `Round ${roundNumber}`,
       detail: 'X starts every new round.',
       icon: User,
-      accent: 'text-mist-500',
-      ring: 'border-2 border-ink-700',
+      accent: 'text-muted',
       result: 'neutral',
     }
   }
@@ -130,14 +120,12 @@ export function GameResult({
       aria-live="polite"
       data-testid="game-result"
       data-result={info.result}
-      className={`result-banner flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-4 py-3 ${info.ring} ${
-        status === 'playing' ? '' : 'animate-result-in'
-      }`}
+      className={`result-banner ${status === 'playing' ? '' : 'animate-result-in'}`}
     >
       <Icon className={`size-5 shrink-0 ${info.accent}`} aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-ink-700">{info.title}</p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-mist-500">{info.detail}</p>
+        <p className="result-title">{info.title}</p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{info.detail}</p>
       </div>
     </div>
   )

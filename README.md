@@ -46,6 +46,7 @@ not the browser - decides whether a move is legal.
 - [Project structure](#project-structure)
 - [Game rules](#game-rules)
 - [AI difficulty levels](#ai-difficulty-levels)
+- [Sound and motion](#sound-and-motion)
 - [Accessibility](#accessibility)
 - [Known limitations](#known-limitations)
 
@@ -57,14 +58,33 @@ not the browser - decides whether a move is legal.
 
 - Player vs Computer with an easy, medium and unbeatable hard AI.
 - Two players on the same device.
+- Board sizes from 3×3 up to 10×10 (100 cells), chosen from presets or with
+  custom rows and columns. The win length adapts (3 on 3×3, 4 up to 7×7, 5 above
+  that) and so does the AI: full minimax on 3×3, four plies up to 16 cells and a
+  line heuristic above that, so even a 10×10 reply arrives in a few milliseconds.
 - Scoreboard, per-mode statistics and a 20-entry match history.
 - Restart round, new match, settings dialog and optional sound effects.
 - Everything persists in `localStorage`.
+- **Arcade feel:** an elastic pop with a shockwave ring and a 2px screen kick on
+  every mark, a hand-drawn X, a lime→cyan laser line with glow on the winning
+  row and eighteen confetti pieces, a breathing border on the empty cells of a
+  small grid, a bouncing score with a floating `+1`, and a full Web Audio sound
+  engine (see [Sound and motion](#sound-and-motion)).
 
 **Online mode (needs a Supabase project)**
 
 - Create a private room, join one with an eight character code, or open an
   invite link.
+- **Roles and permissions:** the creator is the **host** (X) and owns the room,
+  its code and the invite link; the joiner is the **guest** (O) and can only
+  play and leave (plus accept a rematch the host requested). The host leaving
+  closes the room and invalidates the link; the guest is returned to the lobby
+  with a "Host left" message and is never promoted. A guest leaving frees the
+  seat so the host can invite someone else with the same code. A third visitor
+  of a full room is told "Room is full".
+- Choose the board size first: 3x3 up to 10x10 (100 cells), from presets or with
+  custom rows and columns. The room stores the geometry, so both players always
+  play the same board and the same win length (3 on 3x3, 4 up to 7x7, 5 above).
 - Real-time synchronised board, turn indicator, winner and winning line.
 - Server-authoritative moves: the database validates every move.
 - Anonymous sign-in - no account, no email, no password.
@@ -87,6 +107,7 @@ not the browser - decides whether a move is legal.
 | UI tests           | React Testing Library + user-event                  |
 | Database tests     | Vitest + PGlite (a real PostgreSQL engine in WASM)  |
 | Linting            | ESLint 10 flat config with typescript-eslint        |
+| Sound              | Web Audio API - custom engine, no audio assets      |
 
 ## Quick start
 
@@ -200,8 +221,15 @@ Everything below is done **once** in your Supabase project.
 
 ### 2. Apply the database migration
 
-The migration lives in `supabase/migrations/0001_online_multiplayer.sql` and
-creates every table, policy and function the online mode needs.
+The migrations live in `supabase/migrations/` and create every table, policy
+and function the online mode needs:
+
+| File | What it adds |
+| --- | --- |
+| `0001_online_multiplayer.sql` | The whole backend: tables, RPCs, RLS, grants, realtime |
+| `0002_online_moves_user_index.sql` | Index for the `online_moves.user_id` foreign key |
+| `0003_online_board_size.sql` | `rows` / `cols` / `win_length` on rooms, geometry-aware win detection |
+| `0004_online_room_permissions.sql` | `closed` room status, role-aware leave (host closes, guest frees the seat), closed rooms refuse joins |
 
 **Option A - Supabase CLI (recommended)**
 
@@ -229,14 +257,19 @@ supabase db push
 1. Open *SQL Editor -> New query* in the Supabase dashboard.
 2. Paste the contents of `supabase/migrations/0001_online_multiplayer.sql`.
 3. Click *Run*.
+4. Repeat for `0002_online_moves_user_index.sql`,
+   `0003_online_board_size.sql` and `0004_online_room_permissions.sql`, in that order.
 
 **Option C - psql**
 
 ```powershell
 psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0001_online_multiplayer.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0002_online_moves_user_index.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0003_online_board_size.sql
+psql "<your-database-connection-string>" -v ON_ERROR_STOP=1 -f supabase/migrations/0004_online_room_permissions.sql
 ```
 
-The migration is idempotent: re-running it is safe.
+Every migration is idempotent: re-running it is safe.
 
 ### Verifying the hosted database
 
@@ -332,7 +365,9 @@ You should see `PASS:` lines and a final
    id. The id is the only identity - display names are cosmetic labels.
 2. `create_online_room()` creates a room with a cryptographically random
    eight character code, seats the creator as **X** and marks the room
-   `waiting`.
+   `waiting`. The board size the creator picked in the lobby is stored on the
+   room (`rows`, `cols`, `win_length`); the win length is derived by the
+   database, never taken from the browser.
 3. The creator shares the code or the invite link
    (`https://your-app.example/?room=ABCD1234`).
 4. The visitor opens the link. The application shows the invitation but
@@ -351,6 +386,61 @@ You should see `PASS:` lines and a final
 8. A 2.5 second poll runs as a safety net, so the game still synchronises if
    realtime is unavailable or misconfigured.
 
+### Room permissions (TIC-006)
+
+A room has exactly **two roles**, and the role is decided by the database, never
+by the browser:
+
+| Role | Who | Can |
+| --- | --- | --- |
+| **Host** | the creator - seated as X, `is_owner = true` | Create the room, copy the code, copy the invite link, share it, play, leave (= close the room), start a rematch, accept a rematch |
+| **Guest** | the joiner - seated as O through the code or the `?room=` link | **Play and leave only**, and accept a rematch the host asked for |
+| **Spectator** | a third visitor of a full link (no seat) | Leave |
+| **Lobby** | not in a room | Create a room, join a room, choose the board size |
+
+The guest can **not** create a room while inside one, copy the code or the
+invite link, share it, change the board size, delete the room or kick anyone.
+Those controls are hidden in the UI, `useOnlineRoom.createRoom` refuses the
+call when a room is already open, and the database refuses the write paths
+anyway (all table write privileges are revoked - every mutation goes through a
+`SECURITY DEFINER` function).
+
+How leaving works:
+
+- **The host leaves** - the room becomes `closed` immediately. The invite link
+  is dead (re-opening it says "This room is closed or the host left"), the guest
+  sees *"Host left the room"* for three seconds and is returned to the lobby.
+  The guest is **never** promoted to host.
+- **The guest leaves** - the guest seat is freed, the board is reset and the
+  room goes back to `waiting`. The host stays in the waiting room with the same
+  code and can invite somebody else.
+- **Both leave** - the room is closed and the code can never be used again.
+- **Refresh** - the role is re-derived from `online_room_players.is_owner`, so a
+  guest who reloads the page is still a guest.
+- **Third visitor** - a full room answers `online:room_full`
+  ("That room is already full - two players are seated").
+
+Room status is one of `waiting`, `active`, `finished`, `expired`, `closed`.
+
+### Playing with a friend
+
+1. The **host** switches to *Online*, picks a board size in the lobby (3×3 up to
+   10×10, with the live `6×6 • 4 to win` badge) and presses *Create private
+   room*.
+2. The host copies the invite link (or the code) from the waiting room and sends
+   it over any chat app.
+3. The **guest** opens the link and sees the guest banner - *"You are joining as
+   Guest (O) - you can only play and leave"* - then presses *Join this room*.
+   Nothing is taken automatically, so link previewers cannot steal the seat.
+4. They play. Only the player whose turn it is can move, and the database
+   decides whether the move is legal.
+5. If the **host leaves**, the room closes and the link stops working; the guest
+   is told *"Host left the room"* and returns to the lobby.
+6. If the **guest leaves**, the host stays in the waiting room with the same
+   code and can invite a new opponent.
+7. A third person opening a full link is told *"That room is already full - two
+   players are seated"*.
+
 ## Database schema
 
 ### `public.online_rooms`
@@ -359,16 +449,19 @@ You should see `PASS:` lines and a final
 | ---------------------- | ------------- | -------------------------------------------- |
 | `id`                   | `uuid`        | Primary key                                  |
 | `join_code`            | `text`        | Unique, 8 characters of a 32 character alphabet (2^40) |
-| `status`               | `text`        | `waiting` / `active` / `finished` / `expired` |
-| `board`                | `text[]`      | Exactly 9 cells, each `null`, `X` or `O`     |
+| `status`               | `text`        | `waiting` / `active` / `finished` / `expired` / `closed` |
+| `rows`                 | `integer`     | 3-10, chosen by the creator, never changed   |
+| `cols`                 | `integer`     | 3-10, `rows * cols` at most 100              |
+| `win_length`           | `integer`     | 3, 4 or 5, derived from the shape            |
+| `board`                | `text[]`      | Exactly `rows * cols` cells, each `null`, `X` or `O` |
 | `current_turn`         | `text`        | `X` or `O`                                   |
-| `winning_combination`  | `integer[]`   | The three winning cell indexes               |
+| `winning_combination`  | `integer[]`   | The `win_length` winning cell indexes        |
 | `winner_symbol`        | `text`        | `X`, `O` or `null`                           |
 | `result`               | `text`        | `X`, `O`, `draw` or `null`                   |
 | `version`              | `integer`     | Monotonically increasing, used for ordering  |
 | `round_number`         | `integer`     | 1 based                                       |
-| `last_move_index`      | `integer`     | 0-8                                          |
-| `moves_played`         | `integer`     | 0-9                                          |
+| `last_move_index`      | `integer`     | 0 to `rows * cols - 1`                       |
+| `moves_played`         | `integer`     | 0 to `rows * cols`                           |
 | `created_at`/`updated_at`/`expires_at` | `timestamptz` |       |
 
 ### `public.online_room_players`
@@ -392,7 +485,7 @@ constraint is what makes a retried move idempotent.
 
 | Function                            | Purpose                                                   |
 | ----------------------------------- | --------------------------------------------------------- |
-| `create_online_room(display_name)`  | Creates a room, seats the caller as X                     |
+| `create_online_room(display_name, rows, cols)` | Creates a room of that size, seats the caller as X |
 | `join_online_room(code, name)`      | Seats the caller as O, activates the room                 |
 | `get_online_room_state(code)`       | Reads the authoritative state (members only)              |
 | `submit_online_move(code, cell, version, move_id)` | Validates and applies exactly one move         |
@@ -490,34 +583,45 @@ because the tables are still empty.
 npm run test:run
 ```
 
-The suite has 245 tests in 14 files:
+The suite has 314 tests in 15 files:
 
 - **Game logic** (`src/game/gameLogic.test.ts`) - all winning lines for both
   symbols, draw detection, win-over-draw precedence, invalid moves,
-  immutability.
-- **AI** (`src/game/ai.test.ts`) - easy/medium/hard behaviour, and an
-  exhaustive proof that the hard AI never loses in any legally reachable game.
+  immutability, and the dynamic board sizes (the win length table, the 3-10 / 100
+  cell limits, generated lines, row/column/diagonal wins on 4×4 and 10×10, and
+  that four in a row is not enough on a 10×10 board).
+- **AI** (`src/game/ai.test.ts`) - easy/medium/hard behaviour, an exhaustive
+  proof that the hard AI never loses on 3×3 in any legally reachable game, and
+  the big-board behaviour (a 10×10 answer in under half a second, completing and
+  blocking five in a row).
 - **Reducer** (`src/game/gameReducer.test.ts`) - turn alternation, scoring
   exactly once, per-mode score books, round/match flows, the online snapshot
   path (including the version guard that stops an out-of-order event from
-  rolling the board back).
-- **Storage** (`src/utils/storage.test.ts`) - schema validation, the v1 to v2
-  migration, corrupted JSON, blocked `localStorage`.
-- **Sound** (`src/utils/sound.test.ts`) - Web Audio behaviour and failure
-  tolerance.
+  rolling the board back) and the board size changes.
+- **Storage** (`src/utils/storage.test.ts`) - schema validation, the v1 to v2 to
+  v3 migrations, a persisted board size, corrupted JSON, blocked `localStorage`.
+- **Sound** (`src/utils/sound.test.ts`) - the X sweep, the O low-pass, the win
+  arpeggio with its convolver, the draw tremolo, every sound name, the mute flag,
+  the hover throttle and the degraded paths (no API, no filter, throwing node).
 - **Online module** (`src/online/*.test.ts`) - room codes, invite links,
-  configuration validation, the API layer, the error mapping and the room
-  controller (realtime subscription, polling fallback, reconnect, move
-  idempotency).
+  configuration validation, the API layer, the error mapping, the host/guest
+  permission matrix and the room controller (realtime subscription, polling
+  fallback, reconnect, move idempotency, role derivation, host-left return).
 - **Application** (`src/App.test.tsx`, `src/App.online.test.tsx`) - the local
-  modes, the online lobby, room creation, joining, invite links, rematch,
-  connection status and the missing-configuration state.
-- **Database** (`supabase/tests/online_multiplayer.test.ts`) - the **real
-  migration** executed against a real PostgreSQL engine (PGlite) with a small
+  modes, the online lobby, room creation on a chosen board size, joining a room
+  of any size, invite links, rematch, connection status, the guest invite card,
+  the host-only copy controls and the host-left banner, and the
+  missing-configuration state.
+- **Database** (`supabase/tests/online_multiplayer.test.ts`) - every migration
+  executed in order against a real PostgreSQL engine (PGlite) with a small
   Supabase shim. It proves that unauthenticated callers are rejected, that
   seats are allocated correctly, that a third player is turned away, that
   direct table writes fail, that illegal moves are rejected, that a retried
-  move is applied only once and that a rematch needs both players.
+  move is applied only once, that a rematch needs both players, that the host
+  leaving closes the room (and the code can never be joined again) while the
+  guest leaving frees the seat and returns the room to `waiting`, and that a room
+  keeps the board size it was created with (four in a row on a 6×6, five on a
+  10×10, 3×3 when the size is omitted).
 - **SQL script** (`supabase/tests/online_multiplayer_sql.test.ts`) - executes
   the exact `supabase/tests/online_multiplayer.sql` script you paste into the
   Supabase SQL editor, so the script itself is verified and not just the
@@ -664,13 +768,46 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 
 - Mobile first, from a **320 px** viewport upwards - there is no horizontal
   overflow at 320 px in any of the three modes.
-- The board is always square: `max-w-[min(92vw,26rem)] md:max-w-[min(92vw,30rem)]`
-  with `aspect-square` cells, so all nine cells stay easy to tap.
-- Controls wrap instead of scrolling, dialogs are capped at
-  `calc(100dvh - 1.5rem)` and scroll internally.
+- The cells are always square. On a phone the board is capped at
+  `min(30rem, 100%, 50dvh)` on the classic grid and grows a little (`32rem`,
+  then `34rem`) as the grid gets bigger, so a 10×10 board still fits: no
+  horizontal overflow, and the page keeps scrolling vertically.
+- One column on a phone, in game order: **board → round/turn → score →
+  restart/new match → difficulty and board size → match statistics → recent
+  rounds**. The two records panels are collapsed behind their own toggle there.
+- Three columns from 1024 px (records · board · difficulty and board size), each
+  scrolling on its own so the board never drifts off screen.
+- The difficulty and board-size pills scroll sideways on a phone instead of
+  stacking, so both groups stay in one card.
+- Dialogs are capped at `calc(100dvh - 1.5rem)` and scroll internally.
 - Safe areas are respected via `env(safe-area-inset-bottom)`.
-- Desktop uses a two column layout; the board stays the primary focus and the
-  statistics and history move into a sidebar.
+
+### Laptop viewport fit
+
+The board used to be sized by width alone, which was fine on a tall 1920×1032
+display but pushed the score and the restart buttons below the fold on a
+1920×1008 laptop (about 800 px of usable height).
+
+Now, on a desktop (`min-width: 1024px` and `min-height: 600px`), the board is the
+only block allowed to give up height:
+
+- `height: 100dvh; overflow: hidden` on `.app-shell` - the page itself never
+  scrolls; the three columns scroll internally with the themed thin scrollbar.
+- The header is 56 px on a desktop instead of 64 px.
+- The board width is
+  `min(var(--board-max), 100%, max(12rem, (100dvh - 464px) × cols / rows))`.
+  The 464 px is the header, paddings, round/turn row, score and actions that
+  must stay visible, so the board shrinks to the leftover height - 480 px on a
+  1032 px tall display, 436 px at 900 px, 304 px at 768 px and 256 px at 720 px
+  - and the score pills and the restart/new match buttons never leave the first
+  fold.
+- `cols / rows` keeps non-square grids honest: a 3×10 board gets a wide, short
+  frame and a 10×3 board a narrow, tall one. Extremely tall grids stop at 12 rem
+  so the cells stay tappable and scroll inside the stage instead.
+
+Verified at 1920×1032, 1920×1008, 1512×982, 1440×900, 1366×768 and 1280×720:
+`scrollHeight === clientHeight` for the page and for the centre column, and the
+actions row is always the last thing inside the viewport.
 
 ## Project structure
 
@@ -699,7 +836,9 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
 │   ├── tsconfig.json              # TypeScript config for the SQL tests
 │   ├── migrations/
 │   │   ├── 0001_online_multiplayer.sql   # Schema, RLS and the game functions
-│   │   └── 0002_online_moves_user_index.sql # Index for the move log FK
+│   │   ├── 0002_online_moves_user_index.sql # Index for the move log FK
+│   │   ├── 0003_online_board_size.sql    # Room board size + geometry-aware wins
+│   │   └── 0004_online_room_permissions.sql # Host/guest leave rules + closed rooms
 │   └── tests/
 │       ├── harness.ts             # Local PostgreSQL harness (PGlite + shim)
 │       ├── online_multiplayer.test.ts    # Database security tests
@@ -710,37 +849,40 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     ├── main.tsx                   # React entry point
     ├── App.tsx                    # Application shell and state wiring
     ├── components/
+    │   ├── BoardSizePicker.tsx     # Size pills + steppers (settings rail and lobby)
     │   ├── ConfirmDialog.tsx      # Destructive action confirmation
     │   ├── Dialog.tsx             # Reusable accessible modal dialog
-    │   ├── GameBoard.tsx          # 3x3 board, roving tab index, arrow keys
+    │   ├── GameBoard.tsx          # Any rows x cols board, roving tab index, arrow keys
     │   ├── GameCell.tsx           # A single accessible board cell
-    │   ├── GameControls.tsx       # Mode, difficulty, restart, new match
+    │   ├── GameControls.tsx       # Settings cards (difficulty, board size) + round actions
     │   ├── GameHeader.tsx         # Brand, mode indicator, sound and settings
     │   ├── GameResult.tsx         # Round outcome banner (live region)
     │   ├── MatchHistory.tsx       # Recent completed rounds
     │   ├── MatchStats.tsx         # Per-mode statistics
+    │   ├── RailSection.tsx        # Records panel (collapsible on a phone)
     │   ├── ScoreBoard.tsx         # Current match score
     │   ├── SegmentedControl.tsx   # Radio group styled as a segmented control
     │   ├── SettingsDialog.tsx     # Preferences and statistics reset
     │   ├── Toggle.tsx             # Accessible switch
     │   ├── TurnIndicator.tsx      # Whose turn it is (live region)
     │   └── online/
-    │       ├── OnlineActions.tsx      # Rematch and leave controls
+    │       ├── OnlineActions.tsx      # Rematch and leave (guest accepts only)
     │       ├── OnlineLobby.tsx        # Create / join / invitation
     │       ├── OnlinePlayersBar.tsx   # Both players and the connection state
     │       ├── OnlineSetupNotice.tsx  # "Not configured" panel
     │       └── OnlineWaitingRoom.tsx  # Room code, copy, share, leave
     ├── game/
-    │   ├── ai.ts                  # Easy / medium / hard computer opponent
-    │   ├── gameLogic.ts           # Pure rules engine (no React, no DOM)
-    │   ├── gameReducer.ts         # Central state machine and selectors
-    │   └── types.ts               # Shared domain types
+    │   ├── ai.ts                  # Easy / medium / hard, adaptive to the grid shape
+    │   ├── gameLogic.ts           # Pure rules engine; win lines generated per grid
+    │   ├── gameReducer.ts         # State machine, scoring, board-size action
+    │   └── types.ts               # Shared domain types (incl. BoardSize)
     ├── hooks/
     │   └── usePersistentState.ts  # De-duplicated localStorage persistence
     ├── online/
     │   ├── config.ts              # Environment validation
     │   ├── database.types.ts      # GENERATED from the live schema
     │   ├── onlineApi.ts           # Typed wrappers around the RPC functions
+    │   ├── permissions.ts         # Host / guest / lobby permission matrix
     │   ├── roomCode.ts            # Room codes and invite links
     │   ├── supabase.ts            # Lazily loaded Supabase client
     │   ├── useOnlineRoom.ts       # Room controller (realtime + polling)
@@ -753,34 +895,113 @@ to a friendly message. SQL errors, stack traces and secrets are never shown.
     │   └── setup.ts               # Vitest / Testing Library setup
     └── utils/
         ├── clipboard.ts           # Clipboard and Web Share with fallbacks
-        ├── sound.ts               # Web Audio API sound effects
-        └── storage.ts             # Versioned, validated persistence layer
+        ├── sound.ts               # Web Audio engine: 10 synthesised arcade sounds
+        └── storage.ts             # Versioned persistence (v3 adds the board size)
 ```
 
 ## Game rules
 
-Standard Tic-Tac-Toe:
+Classic Tic-Tac-Toe on a 3×3 board, extendable to any size from 3×3 to 10×10:
 
-- The board has nine cells, each holding `X`, `O` or nothing.
+- Every cell holds `X`, `O` or nothing. A board is `rows × cols` cells; the
+  limits are 3 to 10 per side and 100 cells in total.
 - `X` always moves first in a new round. In the online mode the creator of a
   room is X; in a rematch the symbols alternate.
 - Players alternate and may only select empty cells.
 - A finished round never accepts another move.
-- A player wins by occupying three cells in a row, a column or a diagonal:
+- The number of marks needed to win depends on the board:
+
+  | Board | Marks in a line |
+  | --- | --- |
+  | 3×3 | 3 |
+  | 4×4 up to 7×7 | 4 |
+  | 8×8 up to 10×10 | 5 |
+
+  Formally `getWinLength(rows, cols)`: `3` for 3×3, `4` when both sides are at
+  most 7, otherwise `5`.
+- A win is any straight line (row, column or diagonal) of at least that many
+  marks. On the 3×3 board these are exactly the classic eight:
   - rows: `0-1-2`, `3-4-5`, `6-7-8`
   - columns: `0-3-6`, `1-4-7`, `2-5-8`
   - diagonals: `0-4-8`, `2-4-6`
-- If all nine cells are taken and nobody has a line, the round is a draw.
+- If every cell is taken and nobody has a line, the round is a draw.
 - A win always takes precedence over a full board.
+- Changing the board size starts a fresh round (after a confirmation when a
+  round is in progress) and keeps the scores and the history.
+- In the **online mode** the room carries its own `rows`, `cols` and
+  `win_length`, chosen by the creator before the room exists. Both players play
+  that geometry and the server validates every move against it.
 
 ## AI difficulty levels
 
 - **Easy** - picks a uniformly random legal cell.
 - **Medium** - takes an immediate win, otherwise blocks an immediate opponent
-  win, otherwise prefers the center, then a corner, then any legal cell.
-- **Hard** - minimax with memoisation. It never loses against an optimal
-  opponent, prefers faster wins and slower losses, and breaks ties between
-  equally optimal moves pseudo-randomly.
+  win, otherwise prefers the centre, then a corner, then any legal cell.
+- **Hard** - adapts to the board:
+  - **3×3** - full minimax with memoisation. It never loses against an optimal
+    opponent, prefers faster wins and slower losses, and breaks ties between
+    equally optimal moves pseudo-randomly.
+  - **4×4** (and other boards of at most 16 cells) - minimax capped at four
+    plies, then a line heuristic.
+  - **5×5 and up** - the line heuristic only: take an immediate win, block an
+    immediate loss, otherwise maximise the value of the lines the move
+    improves, with a nudge towards the centre. A 10×10 move is answered in a
+    few milliseconds instead of freezing the page.
+
+## Sound and motion
+
+Everything is generated in the browser. There are no audio files, no fonts
+beyond the two Google Fonts already used, no canvas and no animation library:
+the sounds are oscillators and the animations are CSS transforms.
+
+### Sounds (Web Audio API)
+
+`src/utils/sound.ts` builds every sound from oscillators, gains, a low-pass
+filter and one small convolution reverb. X is lime and sharp, O is cyan and
+round, so a player can *hear* whose mark just landed:
+
+| Sound | What it is |
+| --- | --- |
+| `placeX` | 440 → 880 Hz sine sweep plus a 660 Hz triangle: a sharp upward blip |
+| `placeO` | 300 → 150 Hz sine sweep through a 900 Hz low-pass: a deep bubble |
+| `hover` | 800 Hz, 40 ms tick, throttled to one per 100 ms |
+| `win` | C5-E5-G5-C6 arpeggio (523 / 659 / 784 / 1046 Hz) with a 0.2 s reverb |
+| `lose` | 320 → 214 Hz drop |
+| `draw` | 400 Hz and 350 Hz together, 10 Hz tremolo |
+| `click` | 600 Hz square, 50 ms |
+| `turn` | 500 Hz, 60 ms - the turn passes in two-player mode |
+| `invalid` | 150 Hz sawtooth through a 600 Hz filter - an occupied cell |
+| `score` | 900 Hz pop plus a 1200 Hz sparkle |
+
+- One shared mute flag (`setSoundMuted`) is driven by the header speaker
+  button, so any component can play a sound without prop plumbing.
+- The `AudioContext` is created lazily on the first interaction (a click, a
+  hover or a key press) and resumed if the browser suspended it, which is what
+  gets around the autoplay policy.
+- Every call is wrapped: if the API is missing, blocked or throws mid-note, the
+  game simply stays silent.
+
+### Motion
+
+| Where | Effect |
+| --- | --- |
+| Placing a mark | elastic `mark-pop` (0.2 → 1.22 → 0.96 → 1 with rotation), staggered `mark-bar` sweep for the X, a 14px ring pushed out of the cell (`shockwave-lime` / `shockwave-cyan`), 2px board kick (`shake`) |
+| Empty cell, small grids | `cell-breathe` border pulse (2s); hover turns the border lime on X's turn and cyan on O's turn, with a 20px glow |
+| Winning line | lime→cyan gradient, `laser-glow` pulse, plus `win-pulse` on the three winning cells |
+| Win | 18 confetti pieces, generated from the index (never `Math.random` in render) and thrown from the winning line with gravity |
+| Score | the tile glows, the number bounces (`score-bounce`) and a `+1` floats up (`score-plus`) |
+| Turn indicator | the dot pulses to 1.6× (`dot-pulse`) |
+| Result banner | spring slide-in from below with overshoot |
+| Buttons and pills | `scale(0.96)` on press |
+| Board size change | the new board fades and scales in (`board-morph`) |
+
+Everything animates `transform`, `opacity`, `box-shadow` or `filter` only, so it
+stays on the compositor. Rings use `box-shadow` rather than a child element
+because a cell clips its own overflow, and idle breathing is limited to the
+small grids: 100 pulsing borders on a 10×10 would cost more than it is worth.
+
+`prefers-reduced-motion: reduce` neutralises every one of these (the durations
+collapse to a single frame), while the game and the sounds keep working.
 
 ## Accessibility
 
@@ -794,7 +1015,10 @@ Standard Tic-Tac-Toe:
 - Dialogs use `role="dialog"` with `aria-modal`, move focus inside, trap
   `Tab`, close on `Escape` and restore focus to the trigger.
 - X and O differ by shape (a cross and a circle), not only by colour.
-- `prefers-reduced-motion: reduce` disables the animations.
+- `prefers-reduced-motion: reduce` disables every animation and transition
+  (pop, shockwave, magnetic kick, confetti, laser, breathing borders) while
+  keeping the instant state change, and sound is only ever played inside the
+  same tolerant wrapper.
 
 ## Known limitations
 
@@ -815,6 +1039,13 @@ Standard Tic-Tac-Toe:
   unavailable. The game still works, just with a slightly higher latency.
 - Rooms expire after two hours. There is no automatic deletion - run
   `online_expire_rooms()` (see above).
+- **Room permissions** are enforced in three places: the UI (`getPermissions`
+  hides host-only controls from the guest), the controller (`useOnlineRoom`
+  refuses to create a second room while one is open) and the database (every
+  table write privilege is revoked; `leave_online_room` decides the outcome from
+  the `is_owner` seat and a closed room refuses every join). There is no kick,
+  transfer or separate delete-room RPC: the host "deletes" a room by leaving,
+  which closes it.
 - Anonymous sign-in is enabled per Supabase project. If it is disabled the
   online mode cannot create a guest session.
 - For a public deployment, add a CAPTCHA (for example Cloudflare Turnstile)
@@ -824,6 +1055,13 @@ Standard Tic-Tac-Toe:
   profile of each player.
 - Online statistics are stored **locally per browser**. They are not
   synchronised between devices and are not global.
-- The hard AI search is specific to the 3x3 board.
-- Sound effects use the Web Audio API. Some browsers block audio until the
-  first interaction; the game is unaffected and simply stays silent.
+- The hard AI is only *unbeatable* on 3×3. On bigger boards it searches four
+  plies (4×4) or plays a line heuristic (5×5 and up), so a strong human can win.
+- An online room keeps the board size it was created with. On a 10×10 room the
+  cells are small on a phone (38 px at 1400 px wide, ~14 px at 320 px), so the
+  large sizes are best played on a desktop. Rooms are always 3 to 10 per side
+  and at most 100 cells; the server rejects anything else.
+- Sound effects use the Web Audio API. Browsers block audio until the first
+  interaction, so the context is created on the first click, hover or key press;
+  before that (or if the API is blocked entirely) the game is unaffected and
+  simply stays silent.

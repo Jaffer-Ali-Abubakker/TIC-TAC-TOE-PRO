@@ -51,6 +51,65 @@ describe('initial render', () => {
   })
 })
 
+describe('board size', () => {
+  it('switches to a preset board and persists the choice', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '4×4' }))
+
+    expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(16)
+    expect(screen.getByRole('radio', { name: '4×4' })).toBeChecked()
+    expect(await screen.findByText(/4×4 • 4 to win/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(readStored().boardSize).toEqual({ rows: 4, cols: 4, winLength: 4 })
+    })
+  })
+
+  it('asks before discarding a round in progress', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<App />)
+
+    await user.click(cell(1, 1))
+    await user.click(screen.getByRole('radio', { name: '5×5' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/change board size\?/i)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: /change board size/i }))
+    expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(25)
+  })
+
+  it('keeps the current board when the size change is cancelled', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<App />)
+
+    await user.click(cell(1, 1))
+    await user.click(screen.getByRole('radio', { name: '6×6' }))
+    await screen.findByRole('dialog')
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(9)
+    expect(screen.getByRole('radio', { name: '3×3' })).toBeChecked()
+  })
+
+  it('applies a custom rows x columns size through the steppers', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: /more/i }))
+    await user.click(screen.getByRole('button', { name: /increase rows/i }))
+
+    expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(12)
+    expect(screen.getByText(/4×3 • 4 to win/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /decrease rows/i }))
+    expect(screen.getAllByRole('button', { name: /^Row \d, column \d:/ })).toHaveLength(9)
+  })
+})
+
 describe('player versus computer', () => {
   it('places the human symbol and lets the computer answer', async () => {
     const user = userEvent.setup()

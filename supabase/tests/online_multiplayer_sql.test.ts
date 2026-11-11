@@ -9,11 +9,10 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createTestDatabase, type TestDatabase } from './harness'
+import { createTestDatabase, readMigrations, type TestDatabase } from './harness'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const SCRIPT_PATH = resolve(here, 'online_multiplayer.sql')
-const MIGRATION_PATH = resolve(here, '../migrations/0001_online_multiplayer.sql')
 
 let database: TestDatabase
 
@@ -40,9 +39,10 @@ describe('the SQL editor security script', () => {
 
 describe('the migration', () => {
   it('is idempotent and can be re-applied to an existing project', async () => {
-    // The user re-runs the migration in the SQL editor, so it has to be safe.
-    const migration = readFileSync(MIGRATION_PATH, 'utf8')
-    await expect(database.exec(migration)).resolves.toBeUndefined()
+    // The user re-runs the migrations in the SQL editor, so they have to be safe.
+    for (const migration of readMigrations()) {
+      await expect(database.exec(migration.sql)).resolves.toBeUndefined()
+    }
 
     const { rows } = await database.query<{ tables: number; functions: number; policies: number }>(
       `select

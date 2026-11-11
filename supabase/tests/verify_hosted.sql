@@ -38,7 +38,7 @@ select
                  or has_function_privilege('authenticated','public.online_room_payload(uuid,uuid)','execute')
                 then 0 else 1 end)                                                     as payload_locked_expected_1,
   (select count(*)::int from supabase_migrations.schema_migrations
-     where version in ('0001','0002'))                                                 as migrations_recorded_expected_2,
+     where version in ('0001','0002','0003','0004'))                                  as migrations_recorded_expected_4,
   (select count(*)::int from public.online_rooms)                                       as rooms_remaining,
   (select count(*)::int from public.online_room_players)                                as players_remaining,
   (select count(*)::int from public.online_moves)                                       as moves_remaining;

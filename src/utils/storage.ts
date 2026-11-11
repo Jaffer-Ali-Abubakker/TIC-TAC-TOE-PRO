@@ -1,7 +1,20 @@
-import type { Cell, Difficulty, GameMode, HistoryEntry, Player, Stats } from '../game/types'
+import type {
+  BoardSize,
+  Cell,
+  Difficulty,
+  GameMode,
+  HistoryEntry,
+  Player,
+  Stats,
+} from '../game/types'
+import {
+  MAX_CELLS,
+  THREE_BY_THREE,
+  normaliseBoardSize,
+} from '../game/gameLogic'
 
 export const STORAGE_KEY = 'tic-tac-toe-pro:state'
-export const STORAGE_VERSION = 2
+export const STORAGE_VERSION = 3
 export const MAX_HISTORY_ENTRIES = 20
 
 /** Shape of the data that is written to `localStorage`. */
@@ -11,6 +24,7 @@ export interface PersistedState {
   difficulty: Difficulty
   humanSymbol: Player
   soundEnabled: boolean
+  boardSize: BoardSize
   stats: Stats
   history: HistoryEntry[]
 }
@@ -30,6 +44,7 @@ export function createDefaultPersistedState(): PersistedState {
     difficulty: 'medium',
     humanSymbol: 'X',
     soundEnabled: false,
+    boardSize: THREE_BY_THREE,
     stats: createDefaultStats(),
     history: [],
   }
@@ -95,6 +110,15 @@ function parseStats(value: unknown): Stats {
   }
 }
 
+function parseBoardSize(value: unknown): BoardSize {
+  if (!isRecord(value)) return THREE_BY_THREE
+  return normaliseBoardSize(toInteger(value.rows), toInteger(value.cols)) ?? THREE_BY_THREE
+}
+
+function toInteger(value: unknown): number {
+  return isFiniteNumber(value) ? Math.trunc(value) : Number.NaN
+}
+
 function parseHistory(value: unknown): HistoryEntry[] {
   if (!Array.isArray(value)) return []
   const entries: HistoryEntry[] = []
@@ -103,8 +127,18 @@ function parseHistory(value: unknown): HistoryEntry[] {
     if (!isRecord(raw)) continue
     if (!isGameMode(raw.mode)) continue
     if (raw.result !== 'X' && raw.result !== 'O' && raw.result !== 'draw') continue
-    if (!Array.isArray(raw.board) || raw.board.length !== 9) continue
+    // The smallest board is 3x3, the largest is capped at 100 cells.
+    if (!Array.isArray(raw.board) || raw.board.length < 9 || raw.board.length > MAX_CELLS) continue
     if (!raw.board.every(isCell)) continue
+
+    // v3 entries carry their shape; v2 entries were always 3x3.
+    const size =
+      isFiniteNumber(raw.rows) && isFiniteNumber(raw.cols)
+        ? normaliseBoardSize(toInteger(raw.rows), toInteger(raw.cols))
+        : null
+    const rows = size?.rows ?? Math.round(Math.sqrt(raw.board.length))
+    const cols = size?.cols ?? rows
+    if (rows * cols !== raw.board.length) continue
 
     entries.push({
       id: typeof raw.id === 'string' ? raw.id : `entry-${entries.length}`,
@@ -113,6 +147,8 @@ function parseHistory(value: unknown): HistoryEntry[] {
       result: raw.result,
       winnerLabel: typeof raw.winnerLabel === 'string' ? raw.winnerLabel : 'Unknown',
       board: raw.board.slice() as Cell[],
+      rows,
+      cols,
       timestamp: isFiniteNumber(raw.timestamp) ? raw.timestamp : 0,
     })
 
@@ -123,10 +159,10 @@ function parseHistory(value: unknown): HistoryEntry[] {
 }
 
 /**
- * Migrates a version 1 payload to version 2.
+ * Migrates a version 1 or 2 payload to the current version.
  *
- * v1 only knew the `pvc` and `pvp` score books. The online book is added
- * with zeroes so the existing local statistics survive the upgrade.
+ * v1 only knew the `pvc` and `pvp` score books. v2 added the online book and
+ * the online mode. v3 added the board size, which defaults to the classic 3x3.
  */
 export function migratePersistedState(value: Record<string, unknown>): PersistedState {
   const fallback = createDefaultPersistedState()
@@ -139,6 +175,7 @@ export function migratePersistedState(value: Record<string, unknown>): Persisted
     humanSymbol: isPlayer(value.humanSymbol) ? value.humanSymbol : fallback.humanSymbol,
     soundEnabled:
       typeof value.soundEnabled === 'boolean' ? value.soundEnabled : fallback.soundEnabled,
+    boardSize: parseBoardSize(value.boardSize),
     stats: {
       pvc: stats.pvc,
       pvp: stats.pvp,
@@ -156,24 +193,15 @@ export function validatePersistedState(value: unknown): PersistedState {
   const fallback = createDefaultPersistedState()
   if (!isRecord(value)) return fallback
 
-  // Version 1 payloads are migrated instead of being thrown away.
-  if (value.version === 1) {
+  // Older payloads are migrated instead of being thrown away.
+  if (value.version === 1 || value.version === 2) {
     return migratePersistedState(value)
   }
 
   // A future/incompatible version is discarded rather than partially trusted.
   if (value.version !== STORAGE_VERSION) return fallback
 
-  return {
-    version: STORAGE_VERSION,
-    mode: isGameMode(value.mode) ? value.mode : fallback.mode,
-    difficulty: isDifficulty(value.difficulty) ? value.difficulty : fallback.difficulty,
-    humanSymbol: isPlayer(value.humanSymbol) ? value.humanSymbol : fallback.humanSymbol,
-    soundEnabled:
-      typeof value.soundEnabled === 'boolean' ? value.soundEnabled : fallback.soundEnabled,
-    stats: parseStats(value.stats),
-    history: parseHistory(value.history),
-  }
+  return migratePersistedState(value)
 }
 
 /** True when `localStorage` can be read and written in this environment. */

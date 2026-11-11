@@ -9,8 +9,15 @@ export type Player = 'X' | 'O'
 
 export type Cell = Player | null
 
-/** A board is a fixed length tuple of nine cells. */
+/** A board is a flat `rows * cols` array, read left to right, top to bottom. */
 export type Board = readonly Cell[]
+
+/** Geometry of a board: the grid and how many marks in a line win. */
+export interface BoardSize {
+  rows: number
+  cols: number
+  winLength: number
+}
 
 /**
  * `pvc` = player versus computer, `pvp` = two local human players,
@@ -72,5 +79,8 @@ export interface HistoryEntry {
   /** Human readable winner, e.g. "You", "Computer", "Player 2" or "Draw". */
   winnerLabel: string
   board: Cell[]
+  /** Board shape, so the history can redraw a 4x4 final position as 4x4. */
+  rows: number
+  cols: number
   timestamp: number
 }

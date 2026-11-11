@@ -1,6 +1,6 @@
-import type { KeyboardEvent } from 'react'
-import { Circle, X } from 'lucide-react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { Cell } from '../game/types'
+import { playSound } from '../utils/sound'
 
 export interface GameCellProps {
   index: number
@@ -35,6 +35,13 @@ export function GameCell({
 }: GameCellProps) {
   const state = isWinning ? 'winning' : value === null ? 'empty' : 'occupied'
 
+  const handlePointerEnter = (event: PointerEvent<HTMLButtonElement>) => {
+    // A tick only for a mouse that can actually place something; touch drags
+    // and the computer's own moves stay silent.
+    if (event.pointerType !== 'mouse' || isDisabled) return
+    playSound('hover')
+  }
+
   return (
     <button
       type="button"
@@ -42,34 +49,27 @@ export function GameCell({
       aria-label={`Row ${row + 1}, column ${column + 1}: ${describeCell(value, isWinning)}`}
       data-state={state}
       data-index={index}
+      data-last={isLastMove}
+      data-value={value ?? undefined}
       tabIndex={tabIndex}
       onClick={() => {
         if (isDisabled) return
         onSelect(index)
       }}
+      onPointerEnter={handlePointerEnter}
       onKeyDown={(event) => onKeyDown(index, event)}
-      className={`cell-button relative flex aspect-square w-full items-center justify-center rounded-2xl ${
-        isDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
-      }`}
+      className="cell-button"
     >
       {value === 'X' ? (
-        <X
-          className={`mark-x size-[52%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
-          strokeWidth={2.75}
+        <span
+          className={`mark-x ${isLastMove ? 'animate-mark-pop' : ''}`}
           aria-hidden="true"
         />
       ) : null}
       {value === 'O' ? (
-        <Circle
-          className={`mark-o size-[46%] ${isLastMove ? 'animate-symbol-pop' : ''}`}
-          strokeWidth={2.75}
-          aria-hidden="true"
-        />
-      ) : null}
-      {isWinning ? (
         <span
+          className={`mark-o ${isLastMove ? 'animate-mark-pop' : ''}`}
           aria-hidden="true"
-          className="animate-win-pulse pointer-events-none absolute inset-0 rounded-2xl border-2 border-glow-emerald"
         />
       ) : null}
     </button>

@@ -14,14 +14,22 @@
  * The production migration is executed verbatim; only the platform shim is
  * added around it.
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-export const MIGRATION_PATH = resolve(here, '../migrations/0001_online_multiplayer.sql')
+const MIGRATIONS_DIR = resolve(here, '../migrations')
+
+/** Every migration file, in the order `supabase db push` applies them. */
+export function readMigrations(): { name: string; sql: string }[] {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => ({ name, sql: readFileSync(resolve(MIGRATIONS_DIR, name), 'utf8') }))
+}
 
 /** Platform shim - everything the migration expects from Supabase. */
 const SUPABASE_SHIM = `
@@ -97,8 +105,9 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 
   await db.exec(SUPABASE_SHIM)
 
-  const migration = readFileSync(MIGRATION_PATH, 'utf8')
-  await db.exec(migration)
+  for (const migration of readMigrations()) {
+    await db.exec(migration.sql)
+  }
 
   const api: TestDatabase = {
     db,

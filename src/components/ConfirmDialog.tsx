@@ -32,15 +32,15 @@ export function ConfirmDialog({
       onClose={onCancel}
       closeLabel="Cancel"
     >
-      <div className="flex items-start gap-3 rounded-xl border border-ink-700 bg-ink-900 p-3">
+      <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
         <span
           className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-            destructive ? 'bg-glow-rose/10 text-glow-rose' : 'bg-glow-cyan/10 text-glow-cyan'
+            destructive ? 'bg-rose/20 text-rose' : 'bg-lime/20 text-lime'
           }`}
         >
           <TriangleAlert className="size-4" aria-hidden="true" />
         </span>
-        <p className="text-[13px] leading-relaxed text-ink-700">{description}</p>
+        <p className="text-[13px] leading-relaxed text-text">{description}</p>
       </div>
 
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

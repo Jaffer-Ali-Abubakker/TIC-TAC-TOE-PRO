@@ -1,12 +1,15 @@
 import {
+  THREE_BY_THREE,
   createInitialBoard,
   getGameStatus,
   getWinner,
   getWinningCombination,
   makeMove,
+  normaliseBoardSize,
 } from './gameLogic'
 import type {
   Board,
+  BoardSize,
   Difficulty,
   GameMode,
   GameStatus,
@@ -20,6 +23,7 @@ import { createDefaultStats } from '../utils/storage'
 
 /** The authoritative room snapshot produced by the database. */
 export interface OnlineRoomSnapshot {
+  boardSize: BoardSize
   board: readonly (Player | null)[]
   currentTurn: Player
   status: GameStatus
@@ -38,6 +42,8 @@ export interface GameState {
   /** The symbol the human player controls in `pvc` mode. */
   humanSymbol: Player
   soundEnabled: boolean
+  /** Geometry of the current board (`board.length` is always `rows * cols`). */
+  boardSize: BoardSize
   board: Board
   currentPlayer: Player
   status: GameStatus
@@ -63,6 +69,7 @@ export interface GameState {
 export type GameAction =
   | { type: 'playMove'; index: number; player: Player; roundId?: number }
   | { type: 'applyOnlineState'; snapshot: OnlineRoomSnapshot; mySymbol: Player | null }
+  | { type: 'setBoardSize'; rows: number; cols: number }
   | { type: 'newRound' }
   | { type: 'newMatch' }
   | { type: 'setMode'; mode: GameMode }
@@ -77,6 +84,7 @@ export function createInitialGameState(): GameState {
     difficulty: 'medium',
     humanSymbol: 'X',
     soundEnabled: false,
+    boardSize: THREE_BY_THREE,
     board: createInitialBoard(),
     currentPlayer: 'X',
     status: 'playing',
@@ -127,7 +135,7 @@ function startRound(state: GameState, mode: GameMode = state.mode): GameState {
   return {
     ...state,
     mode,
-    board: createInitialBoard(),
+    board: createInitialBoard(state.boardSize),
     currentPlayer: 'X' as Player,
     status: 'playing' as GameStatus,
     winner: null,
@@ -186,6 +194,8 @@ function recordOutcome(state: GameState, result: RoundResult, board: Board): Gam
     result,
     winnerLabel,
     board: board.slice(),
+    rows: state.boardSize.rows,
+    cols: state.boardSize.cols,
     timestamp: Date.now(),
   }
 
@@ -212,14 +222,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       let nextBoard: Board
       try {
-        nextBoard = makeMove(state.board, action.index, action.player)
+        nextBoard = makeMove(state.board, action.index, action.player, state.boardSize)
       } catch {
         return state
       }
 
-      const status = getGameStatus(nextBoard)
-      const winner = getWinner(nextBoard)
-      const winningCombination = getWinningCombination(nextBoard)
+      const status = getGameStatus(nextBoard, state.boardSize)
+      const winner = getWinner(nextBoard, state.boardSize)
+      const winningCombination = getWinningCombination(nextBoard, state.boardSize)
 
       const base: GameState = {
         ...state,
@@ -250,6 +260,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const next: GameState = {
         ...state,
         mode: 'online',
+        // The creator picked the geometry; every client plays it.
+        boardSize: snapshot.boardSize,
         board: snapshot.board.slice(),
         currentPlayer: snapshot.currentTurn,
         status: snapshot.status,
@@ -272,6 +284,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return next
     }
 
+    case 'setBoardSize': {
+      const size = normaliseBoardSize(action.rows, action.cols)
+      if (!size) return state
+      if (size.rows === state.boardSize.rows && size.cols === state.boardSize.cols) return state
+      // A new shape invalidates the board: start a clean round, keep the scores.
+      return startRound({ ...state, boardSize: size })
+    }
+
     case 'newRound':
       return startRound(state)
 
@@ -288,7 +308,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'setMode': {
       if (action.mode === state.mode) return state
       // Switching mode always starts a clean round so a half finished board is
-      // never carried over.
+      // never carried over. The online mode takes its size from the room once
+      // one is joined.
       return startRound(state, action.mode)
     }
 

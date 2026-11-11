@@ -1,14 +1,25 @@
 import { useState } from 'react'
 import { Bot, Link2, LogIn, User, Users } from 'lucide-react'
+import { BoardSizePicker } from '../BoardSizePicker'
+import { normaliseBoardSize } from '../../game/gameLogic'
+import type { BoardSize } from '../../game/types'
 import { formatRoomCode, isValidRoomCode, normalizeRoomCode } from '../../online/roomCode'
+import { type RoomPermissions, type RoomRole } from '../../online/permissions'
 
 export interface OnlineLobbyProps {
   displayName: string
   onDisplayNameChange: (name: string) => void
+  boardSize: BoardSize
+  onBoardSizeChange: (rows: number, cols: number) => void
   busy: boolean
   error: string | null
+  role: RoomRole
+  permissions: RoomPermissions
+  hostLeft: boolean
+  notice?: string | null
   /** A room code that arrived through an invite link. */
-  inviteCode: string | null
+  inviteCode?: string | null
+  onDismissInvite?: () => void
   onCreate: () => void
   onJoin: (code: string) => void
 }
@@ -17,9 +28,15 @@ export interface OnlineLobbyProps {
 export function OnlineLobby({
   displayName,
   onDisplayNameChange,
+  boardSize,
+  onBoardSizeChange,
   busy,
   error,
+  permissions,
+  hostLeft,
+  notice,
   inviteCode,
+  onDismissInvite,
   onCreate,
   onJoin,
 }: OnlineLobbyProps) {
@@ -28,6 +45,7 @@ export function OnlineLobby({
 
   const normalized = normalizeRoomCode(code)
   const codeLooksValid = isValidRoomCode(normalized)
+  const sizeValid = normaliseBoardSize(boardSize.rows, boardSize.cols) !== null
 
   const submitJoin = () => {
     if (!codeLooksValid) {
@@ -41,16 +59,16 @@ export function OnlineLobby({
   return (
     <section className="panel p-4 sm:p-6" aria-label="Online multiplayer lobby">
       <div className="mb-4 flex items-center gap-3">
-        <Users className="size-5 text-glow-cyan" aria-hidden="true" />
+        <Users className="size-5 text-lime" aria-hidden="true" />
         <h2 className="micro-label">Online multiplayer</h2>
       </div>
 
       <div className="panel-inset p-3">
-        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-mist-500">
+        <label htmlFor="online-display-name" className="block text-[13px] font-medium text-muted">
           Your name (optional)
         </label>
         <div className="mt-2 flex items-center gap-2">
-          <User className="size-4 shrink-0 text-mist-500" aria-hidden="true" />
+          <User className="size-4 shrink-0 text-muted" aria-hidden="true" />
           <input
             id="online-display-name"
             type="text"
@@ -58,7 +76,7 @@ export function OnlineLobby({
             maxLength={24}
             placeholder="Player"
             onChange={(event) => onDisplayNameChange(event.target.value)}
-            className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+            className="w-0 min-w-0 flex-1 rounded-sm border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-muted focus:border-lime/60 focus:outline-none"
           />
         </div>
         <p className="helper-text mt-2">
@@ -66,40 +84,81 @@ export function OnlineLobby({
         </p>
       </div>
 
+      {notice ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border-2 border-lime bg-lime/10 px-3 py-2 text-sm text-lime"
+        >
+          {notice}
+        </div>
+      ) : hostLeft ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border-2 border-rose bg-rose/10 px-3 py-2 text-sm text-rose"
+        >
+          Host left the room. This invite link is now invalid. You are back in the lobby.
+        </div>
+      ) : null}
+
       {inviteCode ? (
-        <div className="mt-4 rounded-xl border-2 border-glow-cyan bg-glow-cyan/10 p-3">
-          <p className="flex items-center gap-2 text-[13px] font-semibold text-glow-cyan">
+        <div className="mt-4 rounded-lg border-2 border-lime bg-lime/10 p-3">
+          <p className="flex items-center gap-2 text-[13px] font-semibold text-lime">
             <Link2 className="size-4" aria-hidden="true" />
             You were invited to a room
           </p>
-          <p className="mt-1 font-mono text-lg tracking-widest text-ink-700">
+          <p className="mt-1 font-mono text-lg tracking-widest text-text">
             {formatRoomCode(inviteCode)}
           </p>
-          <button
-            type="button"
-            onClick={() => onJoin(inviteCode)}
-            disabled={busy}
-            className="btn btn-secondary mt-3 w-full"
-          >
-            <LogIn className="size-4" aria-hidden="true" />
-            Join this room
-          </button>
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            You are joining as Guest (O) - you can only play and leave.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onJoin(inviteCode)}
+              disabled={busy}
+              className="btn btn-secondary flex-1"
+            >
+              <LogIn className="size-4" aria-hidden="true" />
+              Join this room
+            </button>
+            {onDismissInvite ? (
+              <button type="button" onClick={onDismissInvite} className="btn btn-ghost">
+                Back to lobby
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       <div className="mt-4 grid gap-3">
-        <button
-          type="button"
-          onClick={onCreate}
-          disabled={busy}
-          className="btn btn-primary w-full"
-        >
-          <Bot className="size-4" aria-hidden="true" />
-          Create private room
-        </button>
+        {inviteCode ? null : (
+          <section className="settings-card" aria-label="Board size">
+            <BoardSizePicker
+              boardSize={boardSize}
+              onChange={onBoardSizeChange}
+              name="local-board-size"
+            />
+            <p className="helper-text mt-2">
+              Both players share this board. The size is fixed once the room exists.
+            </p>
+          </section>
+        )}
+
+        {permissions.canCreateRoom && !inviteCode ? (
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={busy || !sizeValid}
+            className="btn btn-primary w-full"
+          >
+            <Bot className="size-4" aria-hidden="true" />
+            Create private room
+          </button>
+        ) : null}
 
         <div className="panel-inset p-3">
-          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-mist-500">
+          <label htmlFor="online-room-code" className="block text-[13px] font-medium text-muted">
             Join with a room code
           </label>
           <div className="mt-2 flex gap-2">
@@ -123,7 +182,7 @@ export function OnlineLobby({
                   submitJoin()
                 }
               }}
-              className="w-0 min-w-0 flex-1 rounded-sm border border-ink-700 bg-white px-3 py-2 font-mono text-sm uppercase tracking-widest text-ink-700 placeholder:text-mist-500 focus:border-glow-cyan/60 focus:outline-none"
+              className="w-0 min-w-0 flex-1 rounded-sm border border-border bg-card px-3 py-2 font-mono text-sm uppercase tracking-widest text-text placeholder:text-muted focus:border-lime/60 focus:outline-none"
             />
             <button
               type="button"
@@ -135,7 +194,7 @@ export function OnlineLobby({
             </button>
           </div>
           {codeError ? (
-            <p id="online-room-code-error" role="alert" className="mt-2 text-[12px] text-glow-rose">
+            <p id="online-room-code-error" role="alert" className="mt-2 text-[12px] text-rose">
               {codeError}
             </p>
           ) : (
@@ -149,7 +208,7 @@ export function OnlineLobby({
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
+          className="mt-4 rounded-lg border-2 border-rose bg-rose/10 px-3 py-2 text-sm text-rose"
         >
           {error}
         </p>

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { GameHeader } from './components/GameHeader'
 import { ScoreBoard } from './components/ScoreBoard'
 import { GameBoard } from './components/GameBoard'
-import { GameControls } from './components/GameControls'
+import { RoundControls, SettingsCards } from './components/GameControls'
 import { GameResult } from './components/GameResult'
 import { TurnIndicator } from './components/TurnIndicator'
 import { MatchStats } from './components/MatchStats'
 import { MatchHistory } from './components/MatchHistory'
+import { RailSection } from './components/RailSection'
 import { SettingsDialog } from './components/SettingsDialog'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { OnlineLobby } from './components/online/OnlineLobby'
@@ -24,8 +25,9 @@ import {
   type GameState,
 } from './game/gameReducer'
 import { chooseMove } from './game/ai'
-import type { Difficulty, GameMode, Player } from './game/types'
-import { playSound } from './utils/sound'
+import { createInitialBoard, normaliseBoardSize } from './game/gameLogic'
+import type { BoardSize, Difficulty, GameMode, Player } from './game/types'
+import { playSound, setSoundMuted } from './utils/sound'
 import {
   STORAGE_VERSION,
   createDefaultPersistedState,
@@ -57,6 +59,8 @@ function initGameState(persisted: PersistedState): GameState {
     difficulty: persisted.difficulty,
     humanSymbol: persisted.humanSymbol,
     soundEnabled: persisted.soundEnabled,
+    boardSize: persisted.boardSize,
+    board: createInitialBoard(persisted.boardSize),
     stats: persisted.stats,
     history: persisted.history,
   }
@@ -78,14 +82,23 @@ export default function App() {
   const onlineConfig = useMemo(() => readOnlineConfig(), [])
 
   /** The room code from an invite link, if the page was opened with one. */
-  const inviteCode = useMemo(() => {
+  const [inviteCode, setInviteCode] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return parseRoomCodeFromUrl(window.location.href)
+  })
+
+  const dismissInvite = useCallback(() => {
+    if (typeof window === 'undefined') return
+    setInviteCode(null)
+    // Remove the ?room= param from the URL without reloading.
+    const url = new URL(window.location.href)
+    url.searchParams.delete('room')
+    window.history.replaceState({}, '', url.toString())
   }, [])
 
   const computerSymbol = getComputerSymbol(state)
   const thinking = isComputerTurn(state)
-  const { roundId, board, difficulty } = state
+  const { roundId, board, difficulty, boardSize } = state
 
   /* ---------------------------------------------------------------- *
    * Persistence
@@ -97,6 +110,7 @@ export default function App() {
       difficulty: state.difficulty,
       humanSymbol: state.humanSymbol,
       soundEnabled: state.soundEnabled,
+      boardSize: state.boardSize,
       stats: state.stats,
       history: state.history,
     }),
@@ -105,6 +119,7 @@ export default function App() {
       state.difficulty,
       state.humanSymbol,
       state.soundEnabled,
+      state.boardSize,
       state.stats,
       state.history,
     ],
@@ -123,7 +138,7 @@ export default function App() {
     const player = computerSymbol
 
     const timer = window.setTimeout(() => {
-      const index = chooseMove(board, player, difficulty)
+      const index = chooseMove(board, player, difficulty, Math.random, boardSize)
       if (index === null) return
       // The round id guard makes sure a stale reply can never touch a newer
       // round (for example after a restart or a mode change).
@@ -131,7 +146,7 @@ export default function App() {
     }, AI_THINK_DELAY_MS)
 
     return () => window.clearTimeout(timer)
-  }, [thinking, board, difficulty, computerSymbol, roundId])
+  }, [thinking, board, difficulty, computerSymbol, roundId, boardSize])
 
   /* ---------------------------------------------------------------- *
    * Online mode
@@ -142,6 +157,20 @@ export default function App() {
   useEffect(() => {
     if (inviteCode) dispatch({ type: 'setMode', mode: 'online' })
   }, [inviteCode])
+
+  // When the host leaves, the invite link becomes invalid. Drop it from the
+  // URL (an external system) and forget the code once the room snapshot is
+  // gone, so the guest lands in a clean lobby with the create button back.
+  useEffect(() => {
+    if (!online.hostLeft || typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('room')) {
+      url.searchParams.delete('room')
+      window.history.replaceState({}, '', url.toString())
+    }
+    const timer = window.setTimeout(() => setInviteCode(null), 0)
+    return () => window.clearTimeout(timer)
+  }, [online.hostLeft])
 
   // The database is the authority: apply the authoritative snapshot.
   const onlineRoom = online.room
@@ -155,6 +184,11 @@ export default function App() {
     dispatch({
       type: 'applyOnlineState',
       snapshot: {
+        boardSize: {
+          rows: onlineRoom.room.rows,
+          cols: onlineRoom.room.cols,
+          winLength: onlineRoom.room.winLength,
+        },
         board: onlineRoom.room.board,
         currentTurn: onlineRoom.room.currentTurn,
         status,
@@ -175,6 +209,24 @@ export default function App() {
    * ---------------------------------------------------------------- */
   const lastSoundMoveRef = useRef(-1)
 
+  // One shared mute flag, so any component can play without prop plumbing.
+  useEffect(() => {
+    setSoundMuted(!state.soundEnabled)
+  }, [state.soundEnabled])
+
+  // Buttons click, cells do not (they have their own place sound).
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const button = target.closest('button, .segmented-option')
+      if (!button || button.classList.contains('cell-button')) return
+      playSound('click')
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   useEffect(() => {
     if (!state.soundEnabled) return
     if (state.movesPlayed === 0) return
@@ -191,7 +243,9 @@ export default function App() {
       playSound('draw')
       return
     }
-    playSound('move')
+
+    const placed = state.lastMoveIndex === null ? null : state.board[state.lastMoveIndex]
+    playSound(placed === 'O' ? 'placeO' : 'placeX')
   }, [
     state.soundEnabled,
     state.movesPlayed,
@@ -200,6 +254,8 @@ export default function App() {
     state.mode,
     state.humanSymbol,
     state.onlineSymbol,
+    state.board,
+    state.lastMoveIndex,
   ])
 
   /* ---------------------------------------------------------------- *
@@ -216,7 +272,10 @@ export default function App() {
         return
       }
       if (state.status !== 'playing') return
-      if (state.board[index] !== null) return
+      if (state.board[index] !== null) {
+        playSound('invalid')
+        return
+      }
 
       const player: Player = state.mode === 'pvp' ? state.currentPlayer : state.humanSymbol
       if (state.currentPlayer !== player) return
@@ -241,6 +300,7 @@ export default function App() {
           confirmLabel: 'Leave room',
           destructive: true,
           action: () => {
+            dismissInvite()
             void online.leaveRoom()
             dispatch({ type: 'setMode', mode })
           },
@@ -265,7 +325,7 @@ export default function App() {
       }
       dispatch({ type: 'setMode', mode })
     },
-    [state, online, requestConfirm],
+    [state, online, requestConfirm, dismissInvite],
   )
 
   const handleDifficultyChange = useCallback((difficulty: Difficulty) => {
@@ -275,6 +335,29 @@ export default function App() {
   const handleHumanSymbolChange = useCallback((symbol: Player) => {
     dispatch({ type: 'setHumanSymbol', symbol })
   }, [])
+
+  const handleBoardSizeChange = useCallback(
+    (rows: number, cols: number) => {
+      const size: BoardSize | null = normaliseBoardSize(rows, cols)
+      if (!size) return
+      if (size.rows === state.boardSize.rows && size.cols === state.boardSize.cols) return
+
+      const apply = () => dispatch({ type: 'setBoardSize', rows: size.rows, cols: size.cols })
+      // The online lobby picks the size of a room that does not exist yet, so
+      // there is no round on screen to discard.
+      if (state.mode !== 'online' && hasActiveRound(state)) {
+        requestConfirm({
+          title: 'Change board size?',
+          description: `The round in progress will be discarded and a new ${size.rows}×${size.cols} round will start. The scores are kept.`,
+          confirmLabel: 'Change board size',
+          action: apply,
+        })
+        return
+      }
+      apply()
+    },
+    [state, requestConfirm],
+  )
 
   const handleSoundChange = useCallback((enabled: boolean) => {
     dispatch({ type: 'setSoundEnabled', enabled })
@@ -329,6 +412,17 @@ export default function App() {
     setPendingConfirm(null)
   }, [])
 
+  // Spotlight follows the pointer. Only on devices with a fine pointer.
+  useEffect(() => {
+    if (!window.matchMedia('(pointer: fine)').matches) return
+    const track = (event: PointerEvent) => {
+      document.body.style.setProperty('--mouse-x', `${event.clientX}px`)
+      document.body.style.setProperty('--mouse-y', `${event.clientY}px`)
+    }
+    window.addEventListener('pointermove', track, { passive: true })
+    return () => window.removeEventListener('pointermove', track)
+  }, [])
+
   /* ---------------------------------------------------------------- *
    * Render
    * ---------------------------------------------------------------- */
@@ -337,6 +431,10 @@ export default function App() {
   const onlineStatus = onlineRoomState?.room.status ?? null
   const waitingForOpponent = isOnline && onlineStatus === 'waiting'
   const endedWithoutWinner = isOnline && onlineStatus === 'finished' && !onlineRoomState?.room.result
+  const playableRoom = onlineStatus === 'active' || onlineStatus === 'finished'
+  // The board (and its status row) is hidden while the online lobby asks for a room.
+  const showBoard =
+    !isOnline || (onlineConfig.ok && onlineRoomState !== null && playableRoom)
 
   const boardInteractive = isOnline
     ? state.status === 'playing' &&
@@ -347,153 +445,197 @@ export default function App() {
       (state.mode === 'pvp' || state.currentPlayer === state.humanSymbol)
 
   const boardPanel = (
-    <section className="panel panel-raised p-4 sm:p-6" aria-label="Game">
-      <TurnIndicator
-        mode={state.mode}
+    <section className="panel stage-board p-3 sm:p-4" aria-label="Game">
+      <GameBoard
+        key={`${boardSize.rows}x${boardSize.cols}`}
+        board={state.board}
+        rows={boardSize.rows}
+        cols={boardSize.cols}
+        winningCombination={state.winningCombination}
+        lastMoveIndex={state.lastMoveIndex}
         currentPlayer={state.currentPlayer}
-        humanSymbol={state.humanSymbol}
-        isThinking={thinking}
-        mySymbol={state.onlineSymbol}
-        waitingForOpponent={waitingForOpponent}
-      />
-
-      <div className="my-6 sm:my-8">
-        <GameBoard
-          board={state.board}
-          winningCombination={state.winningCombination}
-          lastMoveIndex={state.lastMoveIndex}
-          currentPlayer={state.currentPlayer}
-          isInteractive={boardInteractive}
-          onSelect={handleCellSelect}
-        />
-      </div>
-
-      <GameResult
-        status={state.status}
-        winner={state.winner}
-        mode={state.mode}
-        humanSymbol={state.humanSymbol}
-        roundNumber={state.roundNumber}
-        mySymbol={state.onlineSymbol}
-        endedWithoutWinner={endedWithoutWinner}
+        isInteractive={boardInteractive}
+        onSelect={handleCellSelect}
       />
     </section>
   )
 
   return (
     <div className="app-shell">
-      <div className="grid-texture pointer-events-none fixed inset-0 -z-10" aria-hidden="true" />
+      <div className="scene" aria-hidden="true">
+        <span className="scene-grid" />
+        <span className="scene-blob scene-blob--lime" />
+        <span className="scene-blob scene-blob--cyan" />
+      </div>
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:gap-5 sm:px-5 sm:pt-6">
-        <GameHeader
-          mode={state.mode}
-          soundEnabled={state.soundEnabled}
-          onToggleSound={() => handleSoundChange(!state.soundEnabled)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onModeChange={handleModeChange}
-        />
+      <GameHeader
+        mode={state.mode}
+        soundEnabled={state.soundEnabled}
+        onToggleSound={() => handleSoundChange(!state.soundEnabled)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onModeChange={handleModeChange}
+      />
 
-        <div className="main-container">
-          <main className="board-stage">
-            {!isOnline ? (
-              <ScoreBoard
-                mode={state.mode}
-                stats={state.stats}
-                humanSymbol={state.humanSymbol}
-                currentPlayer={state.currentPlayer}
+      <div className="main-container">
+        <aside className="side-rail side-rail--left">
+          <RailSection title="Match statistics">
+            <MatchStats mode={state.mode} stats={state.stats} />
+          </RailSection>
+          <RailSection title="Recent rounds">
+            <MatchHistory history={state.history} mode={state.mode} />
+          </RailSection>
+        </aside>
+
+        <main className="board-stage">
+          {showBoard ? (
+            <div className="stage-status">
+              <GameResult
                 status={state.status}
+                winner={state.winner}
+                mode={state.mode}
+                humanSymbol={state.humanSymbol}
                 roundNumber={state.roundNumber}
-                completedRounds={state.stats[state.mode].rounds}
+                mySymbol={state.onlineSymbol}
+                endedWithoutWinner={endedWithoutWinner}
+              />
+              <TurnIndicator
+                mode={state.mode}
+                currentPlayer={state.currentPlayer}
+                humanSymbol={state.humanSymbol}
+                isThinking={thinking}
+                mySymbol={state.onlineSymbol}
+                waitingForOpponent={waitingForOpponent}
+              />
+            </div>
+          ) : null}
+
+          {isOnline && !onlineConfig.ok ? (
+            <OnlineSetupNotice message={onlineConfig.error} missing={onlineConfig.missing} />
+          ) : isOnline && !onlineRoomState ? (
+            <OnlineLobby
+              displayName={online.displayName}
+              onDisplayNameChange={online.setDisplayName}
+              boardSize={state.boardSize}
+              onBoardSizeChange={handleBoardSizeChange}
+              busy={online.busy}
+              error={online.error}
+              role={online.role}
+              permissions={online.permissions}
+              hostLeft={online.hostLeft}
+              notice={online.notice}
+              inviteCode={inviteCode}
+              onDismissInvite={dismissInvite}
+              onCreate={() => void online.createRoom(state.boardSize)}
+              onJoin={(code) => void online.joinRoom(code)}
+            />
+          ) : isOnline && online.hostLeft ? (
+            <div className="panel p-4 sm:p-6 text-center" role="alert">
+              <div className="rounded-lg border-2 border-rose bg-rose/10 px-3 py-4">
+                <p className="text-rose font-medium">Host left the room</p>
+                <p className="mt-1 text-sm text-muted">
+                  This invite link is now invalid. Returning to lobby...
+                </p>
+              </div>
+            </div>
+          ) : isOnline && waitingForOpponent ? (
+            <>
+              <OnlinePlayersBar
+                players={onlineRoomState?.players ?? []}
+                myUserId={online.userId}
+                mySymbol={online.mySymbol}
+                connection={online.connection}
+                opponentPresent={online.opponentPresent}
+                roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+                boardSize={state.boardSize}
+              />
+              <OnlineWaitingRoom
+                roomCode={onlineRoomState?.room.joinCode ?? ''}
+                inviteLink={online.inviteLink}
+                boardSize={state.boardSize}
+                role={online.role}
+                notice={online.notice}
+                busy={online.busy}
+                onLeave={() => {
+                  dismissInvite()
+                  void online.leaveRoom()
+                }}
+              />
+            </>
+          ) : isOnline ? (
+            <>
+              <OnlinePlayersBar
+                players={onlineRoomState?.players ?? []}
+                myUserId={online.userId}
+                mySymbol={online.mySymbol}
+                connection={online.connection}
+                opponentPresent={online.opponentPresent}
+                roundNumber={onlineRoomState?.room.roundNumber ?? 1}
+                boardSize={state.boardSize}
+              />
+              {boardPanel}
+            </>
+          ) : (
+            boardPanel
+          )}
+
+          {!isOnline ? (
+            <ScoreBoard
+              mode={state.mode}
+              stats={state.stats}
+              humanSymbol={state.humanSymbol}
+              currentPlayer={state.currentPlayer}
+              status={state.status}
+            />
+          ) : null}
+
+          <RoundControls
+            mode={state.mode}
+            onRestart={handleRestart}
+            onNewMatch={handleNewMatch}
+          >
+            {isOnline &&
+            onlineConfig.ok &&
+            onlineRoomState &&
+            playableRoom ? (
+              <OnlineActions
+                busy={online.busy}
+                canRematch={onlineStatus === 'finished'}
+                iRequestedRematch={online.iRequestedRematch}
+                opponentRequestedRematch={online.opponentRequestedRematch}
+                role={online.role}
+                onRequestRematch={() => void online.requestRematch()}
+                onLeave={() => {
+                  dismissInvite()
+                  void online.leaveRoom()
+                }}
               />
             ) : null}
+            {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
+              <p
+                role="alert"
+                className="mt-3 rounded-xl border border-rose/40 bg-rose/10 px-3 py-2 text-sm text-rose"
+              >
+                {online.error}
+              </p>
+            ) : null}
+          </RoundControls>
+        </main>
 
-            {isOnline && !onlineConfig.ok ? (
-              <OnlineSetupNotice message={onlineConfig.error} missing={onlineConfig.missing} />
-            ) : isOnline && !onlineRoomState ? (
-              <OnlineLobby
-                displayName={online.displayName}
-                onDisplayNameChange={online.setDisplayName}
-                busy={online.busy}
-                error={online.error}
-                inviteCode={inviteCode}
-                onCreate={() => void online.createRoom()}
-                onJoin={(code) => void online.joinRoom(code)}
-              />
-            ) : isOnline && waitingForOpponent ? (
-              <>
-                <OnlinePlayersBar
-                  players={onlineRoomState?.players ?? []}
-                  myUserId={online.userId}
-                  mySymbol={online.mySymbol}
-                  connection={online.connection}
-                  opponentPresent={online.opponentPresent}
-                  roundNumber={onlineRoomState?.room.roundNumber ?? 1}
-                />
-                <OnlineWaitingRoom
-                  roomCode={onlineRoomState?.room.joinCode ?? ''}
-                  inviteLink={online.inviteLink}
-                  busy={online.busy}
-                  onLeave={() => void online.leaveRoom()}
-                />
-              </>
-            ) : isOnline ? (
-              <>
-                <OnlinePlayersBar
-                  players={onlineRoomState?.players ?? []}
-                  myUserId={online.userId}
-                  mySymbol={online.mySymbol}
-                  connection={online.connection}
-                  opponentPresent={online.opponentPresent}
-                  roundNumber={onlineRoomState?.room.roundNumber ?? 1}
-                />
-                {boardPanel}
-              </>
-            ) : (
-              boardPanel
-            )}
-
-            <GameControls
-              mode={state.mode}
-              difficulty={state.difficulty}
-              onDifficultyChange={handleDifficultyChange}
-              onRestart={handleRestart}
-              onNewMatch={handleNewMatch}
-            >
-              {isOnline &&
-              onlineConfig.ok &&
-              onlineRoomState &&
-              onlineStatus !== 'waiting' ? (
-                <OnlineActions
-                  busy={online.busy}
-                  canRematch={onlineStatus === 'finished'}
-                  iRequestedRematch={online.iRequestedRematch}
-                  opponentRequestedRematch={online.opponentRequestedRematch}
-                  onRequestRematch={() => void online.requestRematch()}
-                  onLeave={() => void online.leaveRoom()}
-                />
-              ) : null}
-              {isOnline && onlineConfig.ok && onlineRoomState && online.error ? (
-                <p
-                  role="alert"
-                  className="mt-3 rounded-xl border-2 border-glow-rose bg-glow-rose/10 px-3 py-2 text-sm text-glow-rose"
-                >
-                  {online.error}
-                </p>
-              ) : null}
-            </GameControls>
-          </main>
-
-          <aside className="side-rail">
-            <MatchStats mode={state.mode} stats={state.stats} />
-            <MatchHistory history={state.history} mode={state.mode} />
-          </aside>
-        </div>
-
-        <footer className="mt-4 text-center text-[13px] leading-relaxed text-mist-500">
-          Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move
-          across the board.
-        </footer>
+        <aside className="side-rail side-rail--right">
+          <SettingsCards
+            mode={state.mode}
+            difficulty={state.difficulty}
+            boardSize={boardSize}
+            onDifficultyChange={handleDifficultyChange}
+            onBoardSizeChange={handleBoardSizeChange}
+          />
+        </aside>
       </div>
+
+      <footer className="shrink-0 border-t border-white/5 px-4 py-3 text-center text-[12px] leading-relaxed text-muted">
+        Tic-Tac-Toe Pro - local data stays in this browser. Tip: use the arrow keys to move across
+        the board.
+      </footer>
 
       <SettingsDialog
         open={settingsOpen}
